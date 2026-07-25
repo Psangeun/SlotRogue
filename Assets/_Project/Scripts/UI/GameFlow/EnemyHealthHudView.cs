@@ -91,7 +91,6 @@ namespace SlotRogue.UI.GameFlow
             InitializeHpFillLayout(fillRect);
 
             float ratio = max <= 0 ? 0f : Mathf.Clamp01((float)current / max);
-            _hpFill.type = Image.Type.Simple;
             _hpFill.preserveAspect = false;
             float targetWidth = _hpFillMaxWidth * ratio;
             if (!_hpFillRendered)
