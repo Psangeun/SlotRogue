@@ -13,12 +13,18 @@ namespace SlotRogue.Core.Combat
 
         public EncounterScaleResult Scale(EncounterScaleRequest request)
         {
-            float battleGrowth = (request.BattleNumber - 1) * _config.HpIncreasePerBattle;
-            float themeSectionGrowth = request.ThemeSectionIndex * _config.HpIncreasePerThemeSection;
-            float growthMultiplier = 1f + battleGrowth + themeSectionGrowth;
-            float scaledHp = request.BaseMaxHp * growthMultiplier * request.TierHpMultiplier;
-            int maxHp = Math.Max(1, (int)Math.Round(scaledHp, MidpointRounding.AwayFromZero));
-            return new EncounterScaleResult(maxHp);
+            float multiplier = ResolveMultiplier(request);
+            int maxHp = Math.Max(
+                1,
+                (int)Math.Round(request.BaseMaxHp * multiplier, MidpointRounding.AwayFromZero));
+            return new EncounterScaleResult(maxHp, multiplier);
+        }
+
+        private float ResolveMultiplier(EncounterScaleRequest request)
+        {
+            float battleGrowth = (request.BattleNumber - 1) * _config.IncreasePerBattle;
+            float themeSectionGrowth = request.ThemeSectionIndex * _config.IncreasePerThemeSection;
+            return (1f + battleGrowth + themeSectionGrowth) * request.TierMultiplier;
         }
     }
 }

@@ -407,11 +407,11 @@ namespace SlotRogue.UI.Tests.GameFlow
             });
             var context = new EncounterBuildContext(EncounterTier.Elite, battleNumber: 3, themeSectionIndex: 1);
             var config = new EncounterBalanceConfig(
-                hpIncreasePerBattle: 0.1f,
-                hpIncreasePerThemeSection: 0.25f,
-                normalTierHpMultiplier: 1f,
-                eliteTierHpMultiplier: 1.5f,
-                bossTierHpMultiplier: 2f);
+                increasePerBattle: 0.1f,
+                increasePerThemeSection: 0.25f,
+                normalTierMultiplier: 1f,
+                eliteTierMultiplier: 1.5f,
+                bossTierMultiplier: 2f);
 
             RunEncounterRoster roster = RunEncounterRosterBuilder.Build(selection, context, config);
 
@@ -422,17 +422,67 @@ namespace SlotRogue.UI.Tests.GameFlow
         }
 
         [Test]
+        public void RunEncounterRosterBuilder_BuildSelectionWithContext_ScalesSupportedActionAmounts()
+        {
+            MonsterTurnPatternDefinition pattern = Pattern(Turn(
+                Action("Attack", Damage(4, CombatTargetMode.SelectedEnemy)),
+                Action("Guard", Shield(3, CombatTargetMode.Self)),
+                Action("Recover", Heal(2, CombatTargetMode.Self)),
+                Action("Burn", Status(StatusEffectKind.Burn, 2, CombatTargetMode.SelectedEnemy)),
+                Action("Weaken", Status(StatusEffectKind.Weaken, 2, CombatTargetMode.SelectedEnemy)),
+                Action("Freeze", Status(StatusEffectKind.Freeze, 2, CombatTargetMode.SelectedEnemy)),
+                Action("Lock", new LockSlotEffectDefinition(lockCount: 1, durationTurns: 2))));
+            MonsterDefinition definition = ScriptableObject.CreateInstance<MonsterDefinition>();
+            definition.maxHp = 20;
+            definition.turnPattern = pattern;
+            var selection = new EncounterSelection(new[]
+            {
+                new SelectedEncounterMonster(definition, formationSlot: 1),
+            });
+            var context = new EncounterBuildContext(EncounterTier.Elite, battleNumber: 3, themeSectionIndex: 1);
+            var config = new EncounterBalanceConfig(
+                increasePerBattle: 0.1f,
+                increasePerThemeSection: 0.25f,
+                normalTierMultiplier: 1f,
+                eliteTierMultiplier: 1.5f,
+                bossTierMultiplier: 2f);
+
+            RunEncounterRoster roster = RunEncounterRosterBuilder.Build(selection, context, config);
+            EnemyCombatant combatant = roster.Enemies[0].Combatant;
+            combatant.PlanNextAction(Context(combatant.Participant));
+
+            EnemyActionPlan plan = combatant.UpcomingPlan;
+            Assert.That(plan.Effects[0].Amount, Is.EqualTo(9));
+            Assert.That(plan.Effects[1].Amount, Is.EqualTo(7));
+            Assert.That(plan.Effects[2].Amount, Is.EqualTo(4));
+            Assert.That(plan.Effects[3].StatusEffect.Magnitude, Is.EqualTo(4));
+            Assert.That(plan.Effects[4].StatusEffect.Magnitude, Is.EqualTo(2));
+            Assert.That(plan.Effects[5].StatusEffect.Duration, Is.EqualTo(4));
+            Assert.That(plan.Actions[6].Effect.Kind, Is.EqualTo(EnemyActionEffectKind.LockSlot));
+            Assert.That(plan.Actions[6].Effect.LockCount, Is.EqualTo(1));
+            Assert.That(plan.Actions[6].Effect.DurationTurns, Is.EqualTo(2));
+            Assert.That(((DamageEffectDefinition)pattern.turns[0].actions[0].Effect).Amount, Is.EqualTo(4));
+            Assert.That(((ShieldEffectDefinition)pattern.turns[0].actions[1].Effect).Amount, Is.EqualTo(3));
+            Assert.That(((HealEffectDefinition)pattern.turns[0].actions[2].Effect).Amount, Is.EqualTo(2));
+            Assert.That(((StatusEffectDefinition)pattern.turns[0].actions[3].Effect).Amount, Is.EqualTo(2));
+            Assert.That(((StatusEffectDefinition)pattern.turns[0].actions[4].Effect).Amount, Is.EqualTo(2));
+            Assert.That(((StatusEffectDefinition)pattern.turns[0].actions[5].Effect).Amount, Is.EqualTo(2));
+            UnityEngine.Object.DestroyImmediate(definition);
+            UnityEngine.Object.DestroyImmediate(pattern);
+        }
+
+        [Test]
         public void EncounterBalanceSettings_CreateConfig_UsesSerializedDefaults()
         {
             EncounterBalanceSettings settings = ScriptableObject.CreateInstance<EncounterBalanceSettings>();
 
             EncounterBalanceConfig config = settings.CreateConfig();
 
-            Assert.That(config.HpIncreasePerBattle, Is.EqualTo(0.05f));
-            Assert.That(config.HpIncreasePerThemeSection, Is.EqualTo(0.25f));
-            Assert.That(config.NormalTierHpMultiplier, Is.EqualTo(1f));
-            Assert.That(config.EliteTierHpMultiplier, Is.EqualTo(1.35f));
-            Assert.That(config.BossTierHpMultiplier, Is.EqualTo(1.8f));
+            Assert.That(config.IncreasePerBattle, Is.EqualTo(0.05f));
+            Assert.That(config.IncreasePerThemeSection, Is.EqualTo(0.25f));
+            Assert.That(config.NormalTierMultiplier, Is.EqualTo(1f));
+            Assert.That(config.EliteTierMultiplier, Is.EqualTo(1.35f));
+            Assert.That(config.BossTierMultiplier, Is.EqualTo(1.8f));
             UnityEngine.Object.DestroyImmediate(settings);
         }
 

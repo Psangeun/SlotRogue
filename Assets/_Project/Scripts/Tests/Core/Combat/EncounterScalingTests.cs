@@ -15,7 +15,7 @@ namespace SlotRogue.Core.Tests.Combat
                 baseMaxHp: 20,
                 battleNumber: 1,
                 themeSectionIndex: 0,
-                tierHpMultiplier: 1f));
+                tierMultiplier: 1f));
 
             Assert.That(result.MaxHp, Is.EqualTo(20));
         }
@@ -23,13 +23,13 @@ namespace SlotRogue.Core.Tests.Combat
         [Test]
         public void Scale_EliteTier_UsesTierMultiplier()
         {
-            var scaling = new EncounterScaling(Config(eliteTierHpMultiplier: 1.5f));
+            var scaling = new EncounterScaling(Config(eliteTierMultiplier: 1.5f));
 
             EncounterScaleResult result = scaling.Scale(new EncounterScaleRequest(
                 baseMaxHp: 20,
                 battleNumber: 1,
                 themeSectionIndex: 0,
-                tierHpMultiplier: 1.5f));
+                tierMultiplier: 1.5f));
 
             Assert.That(result.MaxHp, Is.EqualTo(30));
         }
@@ -37,13 +37,13 @@ namespace SlotRogue.Core.Tests.Combat
         [Test]
         public void Scale_BossTier_UsesTierMultiplier()
         {
-            var scaling = new EncounterScaling(Config(bossTierHpMultiplier: 2f));
+            var scaling = new EncounterScaling(Config(bossTierMultiplier: 2f));
 
             EncounterScaleResult result = scaling.Scale(new EncounterScaleRequest(
                 baseMaxHp: 20,
                 battleNumber: 1,
                 themeSectionIndex: 0,
-                tierHpMultiplier: 2f));
+                tierMultiplier: 2f));
 
             Assert.That(result.MaxHp, Is.EqualTo(40));
         }
@@ -51,13 +51,13 @@ namespace SlotRogue.Core.Tests.Combat
         [Test]
         public void Scale_BattleNumberIncrease_AddsBattleGrowth()
         {
-            var scaling = new EncounterScaling(Config(hpIncreasePerBattle: 0.1f));
+            var scaling = new EncounterScaling(Config(increasePerBattle: 0.1f));
 
             EncounterScaleResult result = scaling.Scale(new EncounterScaleRequest(
                 baseMaxHp: 20,
                 battleNumber: 3,
                 themeSectionIndex: 0,
-                tierHpMultiplier: 1f));
+                tierMultiplier: 1f));
 
             Assert.That(result.MaxHp, Is.EqualTo(24));
         }
@@ -65,15 +65,36 @@ namespace SlotRogue.Core.Tests.Combat
         [Test]
         public void Scale_ThemeSectionIncrease_AddsThemeSectionGrowth()
         {
-            var scaling = new EncounterScaling(Config(hpIncreasePerThemeSection: 0.25f));
+            var scaling = new EncounterScaling(Config(increasePerThemeSection: 0.25f));
 
             EncounterScaleResult result = scaling.Scale(new EncounterScaleRequest(
                 baseMaxHp: 20,
                 battleNumber: 1,
                 themeSectionIndex: 2,
-                tierHpMultiplier: 1f));
+                tierMultiplier: 1f));
 
             Assert.That(result.MaxHp, Is.EqualTo(30));
+        }
+
+        [Test]
+        public void Scale_EffectAmounts_UseSharedMultiplierAndPreserveZero()
+        {
+            var scaling = new EncounterScaling(Config(
+                increasePerBattle: 0.1f,
+                increasePerThemeSection: 0.25f,
+                eliteTierMultiplier: 1.5f));
+
+            EncounterScaleResult result = scaling.Scale(new EncounterScaleRequest(
+                baseMaxHp: 20,
+                battleNumber: 3,
+                themeSectionIndex: 1,
+                tierMultiplier: 1.5f));
+
+            Assert.That(result.MaxHp, Is.EqualTo(44));
+            Assert.That(result.ScaleAmount(4), Is.EqualTo(9));
+            Assert.That(result.ScaleAmount(1), Is.EqualTo(2));
+            Assert.That(result.ScaleAmount(0), Is.EqualTo(0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => result.ScaleAmount(-1));
         }
 
         [Test]
@@ -82,41 +103,41 @@ namespace SlotRogue.Core.Tests.Combat
             var scaling = new EncounterScaling(Config());
 
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                new EncounterScaleRequest(baseMaxHp: 0, battleNumber: 1, themeSectionIndex: 0, tierHpMultiplier: 1f));
+                new EncounterScaleRequest(baseMaxHp: 0, battleNumber: 1, themeSectionIndex: 0, tierMultiplier: 1f));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 0, themeSectionIndex: 0, tierHpMultiplier: 1f));
+                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 0, themeSectionIndex: 0, tierMultiplier: 1f));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 1, themeSectionIndex: -1, tierHpMultiplier: 1f));
+                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 1, themeSectionIndex: -1, tierMultiplier: 1f));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 1, themeSectionIndex: 0, tierHpMultiplier: 0f));
+                new EncounterScaleRequest(baseMaxHp: 10, battleNumber: 1, themeSectionIndex: 0, tierMultiplier: 0f));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 new EncounterBalanceConfig(
-                    hpIncreasePerBattle: -0.1f,
-                    hpIncreasePerThemeSection: 0f,
-                    normalTierHpMultiplier: 1f,
-                    eliteTierHpMultiplier: 1f,
-                    bossTierHpMultiplier: 1f));
+                    increasePerBattle: -0.1f,
+                    increasePerThemeSection: 0f,
+                    normalTierMultiplier: 1f,
+                    eliteTierMultiplier: 1f,
+                    bossTierMultiplier: 1f));
 
             Assert.DoesNotThrow(() => scaling.Scale(new EncounterScaleRequest(
                 baseMaxHp: 10,
                 battleNumber: 1,
                 themeSectionIndex: 0,
-                tierHpMultiplier: 1f)));
+                tierMultiplier: 1f)));
         }
 
         private static EncounterBalanceConfig Config(
-            float hpIncreasePerBattle = 0f,
-            float hpIncreasePerThemeSection = 0f,
-            float normalTierHpMultiplier = 1f,
-            float eliteTierHpMultiplier = 1f,
-            float bossTierHpMultiplier = 1f)
+            float increasePerBattle = 0f,
+            float increasePerThemeSection = 0f,
+            float normalTierMultiplier = 1f,
+            float eliteTierMultiplier = 1f,
+            float bossTierMultiplier = 1f)
         {
             return new EncounterBalanceConfig(
-                hpIncreasePerBattle,
-                hpIncreasePerThemeSection,
-                normalTierHpMultiplier,
-                eliteTierHpMultiplier,
-                bossTierHpMultiplier);
+                increasePerBattle,
+                increasePerThemeSection,
+                normalTierMultiplier,
+                eliteTierMultiplier,
+                bossTierMultiplier);
         }
     }
 }

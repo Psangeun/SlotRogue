@@ -1,6 +1,6 @@
 ﻿# 프로젝트 상태
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-25_
 
 ---
 
@@ -103,6 +103,7 @@ High-level 마일스톤. 각 주차 안에서 기능 단위 exec-plan으로 분�
 | Plan | Finished | Outcome (한 줄) |
 |------|----------|-----------------|
 | [`feature-combat-damage-vfx.md`](./exec-plans/completed/feature-combat-damage-vfx.md) | 2026-07-12 | PlayerDirectDamage HitFlash·SlashCut과 조합형 VFX 전달 경로, 비활성 Animator Idle 시작 순서 정리 |
+| [`feature-encounter-effect-scaling.md`](./exec-plans/completed/feature-encounter-effect-scaling.md) | 2026-07-25 | 적 HP와 Damage·Shield·Heal 및 화상·감염·가시·동결 상태 수치에 공용 Encounter 난이도 배율 적용 |
 | [`feature-rule-based-encounter-selection.md`](./exec-plans/completed/feature-rule-based-encounter-selection.md) | 2026-06-22 | ThemeGroup·Tier·Weight 기반 Encounter 선택, WaveSchedule/HP scaling/roster build 경로 연결 |
 | [`feature-tutorial-battle-flow.md`](./exec-plans/completed/feature-tutorial-battle-flow.md) | 2026-06-19 | 2마리 튜토리얼 전투, 고정 2스핀, 스핀/스왑/별조각 안내, 승리 후 일반 런 전환 |
 | [`feature-first-run-tutorial.md`](./exec-plans/completed/feature-first-run-tutorial.md) | 2026-06-19 | 최초 1회 `RunGame` 튜토리얼 모드, 시작 유물 스킵, 확정 첫 스핀, 몬스터 의도·피격·다음 턴 안내 |
