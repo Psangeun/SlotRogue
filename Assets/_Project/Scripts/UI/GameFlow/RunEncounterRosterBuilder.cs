@@ -97,13 +97,13 @@ namespace SlotRogue.UI.GameFlow
                     monster.Definition.maxHp,
                     buildContext.BattleNumber,
                     buildContext.ThemeSectionIndex,
-                    buildContext.ResolveTierHpMultiplier(balanceConfig)));
+                    buildContext.ResolveTierMultiplier(balanceConfig)));
                 enemies[index] = BuildUnit(
                     combatantFactory,
                     monster.Definition,
                     index,
                     monster.FormationSlot,
-                    scaleResult.MaxHp);
+                    scaleResult);
             }
 
             return new RunEncounterRoster(enemies);
@@ -161,6 +161,25 @@ namespace SlotRogue.UI.GameFlow
                 definition,
                 rosterIndex,
                 maxHp);
+
+            return new EnemyEncounterUnit(
+                buildResult.Combatant,
+                definition,
+                formationSlot,
+                buildResult.PresentationMap);
+        }
+
+        private static EnemyEncounterUnit BuildUnit(
+            EnemyCombatantFactory combatantFactory,
+            MonsterDefinition definition,
+            int rosterIndex,
+            int formationSlot,
+            EncounterScaleResult scaleResult)
+        {
+            EnemyCombatantBuildResult buildResult = combatantFactory.CreateWithPresentation(
+                definition,
+                rosterIndex,
+                scaleResult);
 
             return new EnemyEncounterUnit(
                 buildResult.Combatant,

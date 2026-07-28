@@ -4,49 +4,49 @@ namespace SlotRogue.Core.Combat
 {
     public readonly struct EncounterBalanceConfig
     {
-        public float HpIncreasePerBattle { get; }
-        public float HpIncreasePerThemeSection { get; }
-        public float NormalTierHpMultiplier { get; }
-        public float EliteTierHpMultiplier { get; }
-        public float BossTierHpMultiplier { get; }
+        public float IncreasePerBattle { get; }
+        public float IncreasePerThemeSection { get; }
+        public float NormalTierMultiplier { get; }
+        public float EliteTierMultiplier { get; }
+        public float BossTierMultiplier { get; }
 
         public EncounterBalanceConfig(
-            float hpIncreasePerBattle,
-            float hpIncreasePerThemeSection,
-            float normalTierHpMultiplier,
-            float eliteTierHpMultiplier,
-            float bossTierHpMultiplier)
+            float increasePerBattle,
+            float increasePerThemeSection,
+            float normalTierMultiplier,
+            float eliteTierMultiplier,
+            float bossTierMultiplier)
         {
-            if (hpIncreasePerBattle < 0f)
+            if (increasePerBattle < 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(hpIncreasePerBattle));
+                throw new ArgumentOutOfRangeException(nameof(increasePerBattle));
             }
 
-            if (hpIncreasePerThemeSection < 0f)
+            if (increasePerThemeSection < 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(hpIncreasePerThemeSection));
+                throw new ArgumentOutOfRangeException(nameof(increasePerThemeSection));
             }
 
-            if (normalTierHpMultiplier <= 0f)
+            if (normalTierMultiplier <= 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(normalTierHpMultiplier));
+                throw new ArgumentOutOfRangeException(nameof(normalTierMultiplier));
             }
 
-            if (eliteTierHpMultiplier <= 0f)
+            if (eliteTierMultiplier <= 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(eliteTierHpMultiplier));
+                throw new ArgumentOutOfRangeException(nameof(eliteTierMultiplier));
             }
 
-            if (bossTierHpMultiplier <= 0f)
+            if (bossTierMultiplier <= 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(bossTierHpMultiplier));
+                throw new ArgumentOutOfRangeException(nameof(bossTierMultiplier));
             }
 
-            HpIncreasePerBattle = hpIncreasePerBattle;
-            HpIncreasePerThemeSection = hpIncreasePerThemeSection;
-            NormalTierHpMultiplier = normalTierHpMultiplier;
-            EliteTierHpMultiplier = eliteTierHpMultiplier;
-            BossTierHpMultiplier = bossTierHpMultiplier;
+            IncreasePerBattle = increasePerBattle;
+            IncreasePerThemeSection = increasePerThemeSection;
+            NormalTierMultiplier = normalTierMultiplier;
+            EliteTierMultiplier = eliteTierMultiplier;
+            BossTierMultiplier = bossTierMultiplier;
         }
     }
 }

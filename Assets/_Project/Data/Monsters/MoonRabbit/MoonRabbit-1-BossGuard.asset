@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c4d5e6f7a8b94012a3b4c5d6e7f80905, type: 3}
-  m_Name: MoonRabbit-3
+  m_Name: MoonRabbit-1-BossGuard
   m_EditorClassIdentifier: SlotRogue.Data::SlotRogue.Data.Combat.MonsterDefinition
-  _visual: {fileID: 11400000, guid: cc42f8d143dd42dfb7dab3d78f9516bd, type: 2}
-  maxHp: 17
-  turnPattern: {fileID: 11400000, guid: 86de6eda5a934facb94976adc9eb9468, type: 2}
+  _visual: {fileID: 11400000, guid: b71fd66be8b142efb37780445ba34851, type: 2}
+  maxHp: 11
+  turnPattern: {fileID: 11400000, guid: d1a4f8e2c6b3497aa5d1e9c2b7f40a61, type: 2}

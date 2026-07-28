@@ -14,9 +14,23 @@ namespace SlotRogue.UI.GameFlow
 
         public EnemyActionPlannerBuildResult Build(MonsterTurnPatternDefinition pattern)
         {
+            return Build(pattern, scaleResult: null);
+        }
+
+        public EnemyActionPlannerBuildResult Build(
+            MonsterTurnPatternDefinition pattern,
+            EncounterScaleResult scaleResult)
+        {
+            return Build(pattern, (EncounterScaleResult?)scaleResult);
+        }
+
+        private EnemyActionPlannerBuildResult Build(
+            MonsterTurnPatternDefinition pattern,
+            EncounterScaleResult? scaleResult)
+        {
             if (pattern == null)
             {
-                return BuildDefaultFallback();
+                return BuildDefaultFallback(scaleResult);
             }
 
             if (pattern.turns == null || pattern.turns.Length == 0)
@@ -32,7 +46,8 @@ namespace SlotRogue.UI.GameFlow
                 plans[turnIndex] = ToActionPlan(
                     pattern.turns[turnIndex].actions,
                     presentations,
-                    ref nextActionKey);
+                    ref nextActionKey,
+                    scaleResult);
             }
 
             return new EnemyActionPlannerBuildResult(
@@ -56,10 +71,10 @@ namespace SlotRogue.UI.GameFlow
             return new FixedSequenceEnemyActionPlanner(plans);
         }
 
-        private static EnemyActionPlannerBuildResult BuildDefaultFallback()
+        private static EnemyActionPlannerBuildResult BuildDefaultFallback(EncounterScaleResult? scaleResult)
         {
             return new EnemyActionPlannerBuildResult(
-                CreateDefaultFallback(),
+                CreateDefaultFallback(scaleResult),
                 EnemyActionPresentationMap.Empty);
         }
 
@@ -72,11 +87,19 @@ namespace SlotRogue.UI.GameFlow
 
         private static IEnemyActionPlanner CreateDefaultFallback()
         {
+            return CreateDefaultFallback(scaleResult: null);
+        }
+
+        private static IEnemyActionPlanner CreateDefaultFallback(EncounterScaleResult? scaleResult)
+        {
             return new FixedSequenceEnemyActionPlanner(new[]
             {
                 new EnemyActionPlan(new[]
                 {
-                    new CombatEffect(CombatEffectKind.Damage, 2, CombatEffectTarget.Enemy),
+                    new CombatEffect(
+                        CombatEffectKind.Damage,
+                        ScaleAmount(2, scaleResult),
+                        CombatEffectTarget.Enemy),
                 }),
             });
         }
@@ -92,7 +115,8 @@ namespace SlotRogue.UI.GameFlow
         private static EnemyActionPlan ToActionPlan(
             IReadOnlyList<EnemyActionDefinition> actions,
             List<EnemyActionPresentation> presentations,
-            ref int nextActionKey)
+            ref int nextActionKey,
+            EncounterScaleResult? scaleResult)
         {
             if (actions == null || actions.Count == 0)
             {
@@ -117,13 +141,15 @@ namespace SlotRogue.UI.GameFlow
                 plannedActions[index] = new EnemyPlannedAction(
                     actionKey,
                     action.ActionName,
-                    ToActionEffect(action.Effect));
+                    ToActionEffect(action.Effect, scaleResult));
             }
 
             return EnemyActionPlan.FromActions(plannedActions);
         }
 
-        private static EnemyActionEffect ToActionEffect(EnemyEffectDefinition definition)
+        private static EnemyActionEffect ToActionEffect(
+            EnemyEffectDefinition definition,
+            EncounterScaleResult? scaleResult)
         {
             if (definition == null)
             {
@@ -135,21 +161,23 @@ namespace SlotRogue.UI.GameFlow
                 case DamageEffectDefinition damage:
                     return EnemyActionEffect.FromCombatEffect(new CombatEffect(
                         CombatEffectKind.Damage,
-                        damage.Amount,
+                        ScaleAmount(damage.Amount, scaleResult),
                         ToCombatEffectTarget(damage.Target)));
                 case ShieldEffectDefinition shield:
                     return EnemyActionEffect.FromCombatEffect(new CombatEffect(
                         CombatEffectKind.Shield,
-                        shield.Amount,
+                        ScaleAmount(shield.Amount, scaleResult),
                         ToCombatEffectTarget(shield.Target)));
                 case HealEffectDefinition heal:
                     return EnemyActionEffect.FromCombatEffect(new CombatEffect(
                         CombatEffectKind.Heal,
-                        heal.Amount,
+                        ScaleAmount(heal.Amount, scaleResult),
                         ToCombatEffectTarget(heal.Target)));
                 case StatusEffectDefinition status:
                     return EnemyActionEffect.FromCombatEffect(CombatEffect.ApplyStatus(
-                        StatusEffectSpec.FromAmount(status.StatusKind, status.Amount),
+                        StatusEffectSpec.FromAmount(
+                            status.StatusKind,
+                            ScaleStatusAmount(status, scaleResult)),
                         ToCombatEffectTarget(status.Target)));
                 case LockSlotEffectDefinition lockSlot:
                     return EnemyActionEffect.LockSlot(lockSlot.LockCount, lockSlot.DurationTurns);
@@ -159,6 +187,26 @@ namespace SlotRogue.UI.GameFlow
                         definition.GetType(),
                         "Unsupported enemy effect definition.");
             }
+        }
+
+        private static int ScaleAmount(int amount, EncounterScaleResult? scaleResult)
+        {
+            return scaleResult.HasValue
+                ? scaleResult.Value.ScaleAmount(amount)
+                : amount;
+        }
+
+        private static int ScaleStatusAmount(
+            StatusEffectDefinition status,
+            EncounterScaleResult? scaleResult)
+        {
+            return status.StatusKind switch
+            {
+                StatusEffectKind.Vulnerable or
+                StatusEffectKind.Weaken or
+                StatusEffectKind.Lifesteal => status.Amount,
+                _ => ScaleAmount(status.Amount, scaleResult),
+            };
         }
 
         private static CombatEffectTarget ToCombatEffectTarget(CombatEffectTargetDefinition target)

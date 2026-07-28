@@ -32,13 +32,13 @@ namespace SlotRogue.UI.GameFlow
 
         public int ThemeSectionIndex { get; }
 
-        public float ResolveTierHpMultiplier(EncounterBalanceConfig config)
+        public float ResolveTierMultiplier(EncounterBalanceConfig config)
         {
             return Tier switch
             {
-                EncounterTier.Elite => config.EliteTierHpMultiplier,
-                EncounterTier.Boss => config.BossTierHpMultiplier,
-                _ => config.NormalTierHpMultiplier,
+                EncounterTier.Elite => config.EliteTierMultiplier,
+                EncounterTier.Boss => config.BossTierMultiplier,
+                _ => config.NormalTierMultiplier,
             };
         }
     }

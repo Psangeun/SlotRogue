@@ -9,21 +9,25 @@ namespace SlotRogue.Data.GameFlow
         menuName = "SlotRogue/GameFlow/Encounter Balance Settings")]
     public sealed class EncounterBalanceSettings : ScriptableObject
     {
-        [SerializeField] private float _hpIncreasePerBattle = 0.05f;
-        [SerializeField, FormerlySerializedAs("_hpIncreasePerCycle")]
-        private float _hpIncreasePerThemeSection = 0.25f;
-        [SerializeField] private float _normalTierHpMultiplier = 1f;
-        [SerializeField] private float _eliteTierHpMultiplier = 1.35f;
-        [SerializeField] private float _bossTierHpMultiplier = 1.8f;
+        [SerializeField, FormerlySerializedAs("_hpIncreasePerBattle")]
+        private float _increasePerBattle = 0.05f;
+        [SerializeField, FormerlySerializedAs("_hpIncreasePerThemeSection"), FormerlySerializedAs("_hpIncreasePerCycle")]
+        private float _increasePerThemeSection = 0.25f;
+        [SerializeField, FormerlySerializedAs("_normalTierHpMultiplier")]
+        private float _normalTierMultiplier = 1f;
+        [SerializeField, FormerlySerializedAs("_eliteTierHpMultiplier")]
+        private float _eliteTierMultiplier = 1.35f;
+        [SerializeField, FormerlySerializedAs("_bossTierHpMultiplier")]
+        private float _bossTierMultiplier = 1.8f;
 
         public EncounterBalanceConfig CreateConfig()
         {
             return new EncounterBalanceConfig(
-                _hpIncreasePerBattle,
-                _hpIncreasePerThemeSection,
-                _normalTierHpMultiplier,
-                _eliteTierHpMultiplier,
-                _bossTierHpMultiplier);
+                _increasePerBattle,
+                _increasePerThemeSection,
+                _normalTierMultiplier,
+                _eliteTierMultiplier,
+                _bossTierMultiplier);
         }
     }
 }

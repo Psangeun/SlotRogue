@@ -305,7 +305,7 @@ namespace SlotRogue.UI.Tests.GameFlow
         }
 
         [Test]
-        public void EnemyHpRender_ResizesFromFixedLeftEdgeWithoutSprite()
+        public void EnemyHpRender_ResizesFromFixedLeftEdgeAndPreservesConfiguredImageType()
         {
             var root = new GameObject("Enemy");
             try
@@ -328,12 +328,13 @@ namespace SlotRogue.UI.Tests.GameFlow
                 fillRect.anchorMax = new Vector2(0.5f, 0.5f);
                 fillRect.pivot = new Vector2(0.5f, 0.5f);
                 Image fill = fillObject.GetComponent<Image>();
+                fill.type = Image.Type.Sliced;
 
                 SetPrivateField(healthHudView, "_hpFill", fill);
 
                 healthHudView.SetHpFill(current: 5, max: 10);
 
-                Assert.That(fill.type, Is.EqualTo(Image.Type.Simple));
+                Assert.That(fill.type, Is.EqualTo(Image.Type.Sliced));
                 Assert.That(fillRect.anchorMin.x, Is.EqualTo(0f));
                 Assert.That(fillRect.anchorMax.x, Is.EqualTo(0f));
                 Assert.That(fillRect.pivot.x, Is.EqualTo(0f));

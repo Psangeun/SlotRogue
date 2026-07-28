@@ -46,6 +46,27 @@ namespace SlotRogue.UI.GameFlow
             int rosterIndex,
             int maxHp)
         {
+            return CreateWithPresentation(definition, rosterIndex, maxHp, scaleResult: null);
+        }
+
+        public EnemyCombatantBuildResult CreateWithPresentation(
+            MonsterDefinition definition,
+            int rosterIndex,
+            EncounterScaleResult scaleResult)
+        {
+            return CreateWithPresentation(
+                definition,
+                rosterIndex,
+                scaleResult.MaxHp,
+                scaleResult);
+        }
+
+        private EnemyCombatantBuildResult CreateWithPresentation(
+            MonsterDefinition definition,
+            int rosterIndex,
+            int maxHp,
+            EncounterScaleResult? scaleResult)
+        {
             if (definition == null)
             {
                 throw new ArgumentNullException(nameof(definition));
@@ -56,7 +77,9 @@ namespace SlotRogue.UI.GameFlow
                 throw new ArgumentOutOfRangeException(nameof(maxHp));
             }
 
-            EnemyActionPlannerBuildResult plannerResult = _plannerFactory.Build(definition.turnPattern);
+            EnemyActionPlannerBuildResult plannerResult = scaleResult.HasValue
+                ? _plannerFactory.Build(definition.turnPattern, scaleResult.Value)
+                : _plannerFactory.Build(definition.turnPattern);
             EnemyCombatant combatant = Create(rosterIndex, maxHp, plannerResult.Planner);
             return new EnemyCombatantBuildResult(combatant, plannerResult.PresentationMap);
         }

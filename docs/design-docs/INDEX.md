@@ -22,6 +22,7 @@
 | [`notifications-weekly-ranking.md`](./notifications-weekly-ranking.md) | accepted | 24시간 미접속 로컬 알림, 주간 랭킹 마감 알림, 한국 수요일 리셋 |
 | [`first-run-tutorial.md`](./first-run-tutorial.md) | draft | 최초 1회 튜토리얼 런, 시작 유물 스킵, 확정 첫 스핀, 전투 안내 오버레이 |
 | [`tutorial-battle-flow.md`](./tutorial-battle-flow.md) | draft | 2마리 튜토리얼 전투, 인벤토리 확인, 유물 반응, 고정 2스핀, 승리 후 로비 복귀 |
+| [`moon-rabbit-monster-so-plan.md`](./moon-rabbit-monster-so-plan.md) | draft | 달토끼 일반 몬스터 4종과 보스 예약 1종의 Pattern/Definition SO authoring 계획 |
 
 ---
 

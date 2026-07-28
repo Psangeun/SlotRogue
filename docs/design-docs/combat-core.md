@@ -192,16 +192,17 @@ GameFlow는 `EnemyActionPlannerFactory`와 `EnemyCombatantFactory`로 `MonsterDe
 
 `MonsterDefinition.maxHp`는 원본 base HP다. 전투 시작 시 GameFlow가 `EncounterBuildContext`(`EncounterTier`, `BattleNumber`, `ThemeSectionIndex`)와 `EncounterBalanceSettings.CreateConfig()` 결과를 사용해 Core `EncounterScaling`에 HP 계산을 요청한다. `EncounterScaling`은 `EncounterBalanceConfig`와 `EncounterScaleRequest`만 사용하며 `ScriptableObject`, `SlotRogue.Data`, `EncounterTier`를 참조하지 않는다.
 
-현재 공식은 HP만 다룬다.
+Encounter 난이도 배율은 [ADR-0022](../adr/0022-encounter-shared-effect-scaling.md)에 따라 HP와 적 행동 Amount에 공용 적용한다.
 
 ```text
-MaxHp = round(
-    BaseHp
-    * (1 + (BattleNumber - 1) * HpIncreasePerBattle + ThemeSectionIndex * HpIncreasePerThemeSection)
-    * TierHpMultiplier)
+Multiplier = (1 + (BattleNumber - 1) * IncreasePerBattle + ThemeSectionIndex * IncreasePerThemeSection)
+    * TierMultiplier
+
+MaxHp = round(BaseHp * Multiplier)
+ScaledAmount = round(AuthoredAmount * Multiplier)
 ```
 
-결과는 최소 1 이상이며, 계산된 max HP가 `EnemyCombatantFactory`에 전달되어 런타임 `CombatParticipant.MaxHp`와 `CurrentHp`에 적용된다. 공격력과 행동 Effect 수치 scaling은 아직 구현하지 않는다. 행동 수치는 `MonsterTurnPatternDefinition`과 각 `EnemyEffectDefinition`의 authored 값을 그대로 사용한다.
+양수 결과는 최소 1 이상이며, 0 Amount는 0으로 유지한다. 계산된 max HP와 공용 배율은 `EnemyCombatantFactory`에 전달되어 런타임 `CombatParticipant.MaxHp`와 적 행동의 Damage, Shield, Heal에 적용된다. 상태이상은 화상·감염·가시와 동결 Amount만 스케일하며, 취약·약화·흡혈의 남은 적용 횟수는 원본 값으로 유지한다. 원본 `MonsterTurnPatternDefinition`과 `EnemyEffectDefinition`은 수정하지 않는다. LockSlot의 잠금 칸 수와 지속 턴은 스케일하지 않는다.
 
 ### Shield 지속
 

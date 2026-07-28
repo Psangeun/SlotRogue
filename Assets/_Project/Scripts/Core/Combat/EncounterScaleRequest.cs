@@ -7,13 +7,13 @@ namespace SlotRogue.Core.Combat
         public int BaseMaxHp { get; }
         public int BattleNumber { get; }
         public int ThemeSectionIndex { get; }
-        public float TierHpMultiplier { get; }
+        public float TierMultiplier { get; }
 
         public EncounterScaleRequest(
             int baseMaxHp,
             int battleNumber,
             int themeSectionIndex,
-            float tierHpMultiplier)
+            float tierMultiplier)
         {
             if (baseMaxHp <= 0)
             {
@@ -30,15 +30,15 @@ namespace SlotRogue.Core.Combat
                 throw new ArgumentOutOfRangeException(nameof(themeSectionIndex));
             }
 
-            if (tierHpMultiplier <= 0f)
+            if (tierMultiplier <= 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(tierHpMultiplier));
+                throw new ArgumentOutOfRangeException(nameof(tierMultiplier));
             }
 
             BaseMaxHp = baseMaxHp;
             BattleNumber = battleNumber;
             ThemeSectionIndex = themeSectionIndex;
-            TierHpMultiplier = tierHpMultiplier;
+            TierMultiplier = tierMultiplier;
         }
     }
 }
