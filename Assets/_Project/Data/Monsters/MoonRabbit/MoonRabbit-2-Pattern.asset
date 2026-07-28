@@ -15,40 +15,52 @@ MonoBehaviour:
   turns:
   - actions:
     - _actionName: Common
-      _intentIcon: {fileID: -604812497723070175, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
+      _intentIcon: {fileID: -6544292231458662415, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
       _effect:
-        rid: 5421931881862791243
+        rid: 2001
+  - actions:
+    - _actionName: Common
+      _intentIcon: {fileID: 3678278031639005610, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
+      _effect:
+        rid: 2002
+    - _actionName: Common
+      _intentIcon: {fileID: -6544292231458662415, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
+      _effect:
+        rid: 2003
   - actions:
     - _actionName: Common
       _intentIcon: {fileID: -6544292231458662415, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
       _effect:
-        rid: 5421931881862791245
-  - actions:
-    - _actionName: Common
-      _intentIcon: {fileID: 1699813192286580615, guid: 93c338089471a6c4e94a99fd84fc12f3, type: 3}
-      _effect:
-        rid: 5421931881862791246
+        rid: 2004
   references:
     version: 2
     RefIds:
-    - rid: 5421931881862791243
-      type: {class: ShieldEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
-      data:
-        _amount: 2
-        _target:
-          _targetMode: 0
-          _targetParticipantId: 0
-    - rid: 5421931881862791245
+    - rid: 2001
       type: {class: DamageEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
       data:
-        _amount: 4
+        _amount: 2
         _target:
           _targetMode: 1
           _targetParticipantId: 0
-    - rid: 5421931881862791246
-      type: {class: HealEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
+    - rid: 2002
+      type: {class: StatusEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
+      data:
+        _statusKind: 5
+        _amount: 1
+        _target:
+          _targetMode: 1
+          _targetParticipantId: 0
+    - rid: 2003
+      type: {class: DamageEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
       data:
         _amount: 2
         _target:
-          _targetMode: 0
+          _targetMode: 1
+          _targetParticipantId: 0
+    - rid: 2004
+      type: {class: DamageEffectDefinition, ns: SlotRogue.Data.Combat, asm: SlotRogue.Data}
+      data:
+        _amount: 6
+        _target:
+          _targetMode: 1
           _targetParticipantId: 0

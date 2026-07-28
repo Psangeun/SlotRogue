@@ -4480,7 +4480,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e104991686d4fdb91228d49a8d5a087, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SlotRogue.UI::SlotRogue.UI.GameFlow.BattleSceneHost
-  _encounterTable: {fileID: 11400000, guid: 65910ce9864d4bd4f9e95d95b407b117, type: 2}
+  _encounterTable: {fileID: 11400000, guid: 74d85c72800105a41a002dd20e71437f, type: 2}
   _waveScheduleDefinition: {fileID: 11400000, guid: 4c0cb456ad7044bbba8313f629ae02ad, type: 2}
   _encounterBalanceSettings: {fileID: 11400000, guid: 1ff29ba914624333ac616241494dfdd4, type: 2}
   _view: {fileID: 6563031118538673050}
