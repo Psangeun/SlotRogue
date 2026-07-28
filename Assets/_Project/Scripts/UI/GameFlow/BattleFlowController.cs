@@ -266,17 +266,6 @@ namespace SlotRogue.UI.GameFlow
             return views;
         }
 
-        public void DevApplyRelicStatusTurn(
-            StatusEffectKind statusEffectKind,
-            int amount,
-            CombatTargetMode targetMode)
-        {
-            DevApplyRelicStatusTurnAsync(
-                statusEffectKind,
-                amount,
-                targetMode).Forget();
-        }
-
         public void Dispose()
         {
             _screenController.SpinRequested -= HandleSpinRequested;
@@ -472,78 +461,6 @@ namespace SlotRogue.UI.GameFlow
                 _pendingSlotTurnResult = null;
                 _slotTurnController.ResetImmediate();
                 _screenController.EndSwapDecision();
-                _turnRunning = false;
-                CompleteBattleIfNeeded();
-                _screenController.Refresh();
-            }
-        }
-
-        private async UniTaskVoid DevApplyRelicStatusTurnAsync(
-            StatusEffectKind statusEffectKind,
-            int amount,
-            CombatTargetMode targetMode)
-        {
-            if (statusEffectKind == StatusEffectKind.None || !CanStartTurn())
-            {
-                _screenController.Refresh();
-                return;
-            }
-
-            CombatParticipantId selectedTargetId = _screenController.SelectedEnemyId;
-            if (targetMode == CombatTargetMode.SelectedEnemy && !selectedTargetId.IsValid)
-            {
-                return;
-            }
-
-            _screenController.SetSpinInteractable(false);
-            _turnRunning = true;
-
-            try
-            {
-                var request = new SlotCombatRequest(
-                    damage: 0,
-                    defense: 0,
-                    attackCount: 1,
-                    healAmount: 0,
-                    isCritical: false,
-                    patternName: $"DEV {statusEffectKind}");
-                StatusEffectRequest[] statusRequests =
-                {
-                    new(
-                        statusEffectKind,
-                        Math.Max(1, amount),
-                        targetMode),
-                };
-                var requestResult = new RunCombatRequestResult(
-                    baseRequest: request,
-                    finalRequest: request,
-                    relicActivationSummary: $"DEV RELIC: {statusEffectKind} {Math.Max(1, amount)}",
-                    runBonusSummary: string.Empty,
-                    statusEffectsToApply: CombatTurnRequestBuilder.BuildStatusEffectSpecs(statusRequests));
-                _screenController.UpdateTurnResult(null, requestResult);
-
-                CombatEffect[] playerEffects = _converter.Convert(
-                    requestResult.FinalRequest,
-                    selectedTargetId,
-                    requestResult.StatusEffectsToApply);
-                var presentationContext =
-                    new PresentationContext(isCritical: false, requestResult.FinalRequest.PatternName);
-                int eventCursor = _battle.Events.Count;
-                BattleApplyResult result = _battle.ApplyPlayerTurn(playerEffects, selectedTargetId);
-
-                if (result.Accepted)
-                {
-                    await _battlePresentationController.PresentEventsAsync(
-                        _battle,
-                        eventCursor,
-                        presentationContext,
-                        _presentationCancellationToken,
-                        BeforeBattleEventPresentedAsync,
-                        AfterBattleEventPresentedAsync);
-                }
-            }
-            finally
-            {
                 _turnRunning = false;
                 CompleteBattleIfNeeded();
                 _screenController.Refresh();

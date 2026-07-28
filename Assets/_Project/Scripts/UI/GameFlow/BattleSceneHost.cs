@@ -122,23 +122,6 @@ namespace SlotRogue.UI.GameFlow
             _resultRecorder.FinalizePendingDefeat();
         }
 
-        public void DevApplyRelicStatusTurn(
-            StatusEffectKind statusEffectKind,
-            int amount,
-            CombatTargetMode targetMode)
-        {
-            if (_battleFlowController == null)
-            {
-                Debug.LogWarning("[BattleSceneHost] Battle flow is not initialized.");
-                return;
-            }
-
-            _battleFlowController.DevApplyRelicStatusTurn(
-                statusEffectKind,
-                amount,
-                targetMode);
-        }
-
         public void SetTutorialSpinBlocked(bool blocked)
         {
             _tutorialSpinBlocked = blocked;
