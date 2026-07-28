@@ -59,6 +59,13 @@ MonoBehaviour:
     - default
     - relic-icon
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: afa84c3e1168ffd44a1c9ba75a1da7af
+    m_Address: Relic Sheet 300
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    - relic-icon
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ade757b05a113bc4abad410e56f1ee2d
     m_Address: slot/catalog/patterns
     m_ReadOnly: 0

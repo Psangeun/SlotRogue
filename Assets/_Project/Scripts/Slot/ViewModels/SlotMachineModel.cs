@@ -27,6 +27,7 @@ namespace SlotRogue.Slot.ViewModels
             _resultCalculator = resultCalculator ?? new SlotResultCalculator();
             _combatRequestBuilder = combatRequestBuilder ?? new SlotCombatRequestBuilder();
             CanSpin = true;
+            _againMarks = new bool[SlotSpinResult.CellCount];
             CurrentPatternMatches = Array.Empty<SlotPatternMatch>();
             CurrentPatternResult = SlotPatternResult.NoMatch;
             CurrentCalculationResult = SlotCalculationResult.Empty;
@@ -56,6 +57,12 @@ namespace SlotRogue.Slot.ViewModels
 
         public bool IsCurrentSpinResolved { get; private set; }
 
+        /// <summary>
+        /// 현재 보드 셀별 "다시"(Again) 표식(5x3 셀 인덱스 기준). 표식이 든 족보는 셀 수만큼 재발동한다.
+        /// 표식은 스핀 생성 시 <see cref="SetAgainMarks"/>로 주입되고, 스왑 시 심볼을 따라 함께 이동한다.
+        /// </summary>
+        public IReadOnlyList<bool> CurrentAgainMarks => _againMarks;
+
         public void Spin()
         {
             if (!CanSpin)
@@ -66,7 +73,17 @@ namespace SlotRogue.Slot.ViewModels
             CanSpin = false;
             SlotSpinResult spinResult = _slotMachineService.Spin();
             CanSpin = true;
+            ClearAgainMarks();
             SetCurrentSpinResult(spinResult);
+        }
+
+        /// <summary>이번 스핀 보드에 "다시" 표식을 설정한다(스핀 생성 직후 상위 레이어가 호출).</summary>
+        public void SetAgainMarks(IReadOnlyList<bool> marks)
+        {
+            for (int index = 0; index < _againMarks.Length; index++)
+            {
+                _againMarks[index] = marks != null && index < marks.Count && marks[index];
+            }
         }
 
         public bool TrySwapAdjacentSymbols(int firstIndex, int secondIndex)
@@ -78,6 +95,13 @@ namespace SlotRogue.Slot.ViewModels
             }
 
             SetCurrentSpinResult(CurrentSpinResult.SwapAdjacent(firstIndex, secondIndex));
+            // "다시" 표식은 심볼을 따라간다 — 심볼과 함께 두 칸의 표식도 맞바꾼다.
+            if (SlotSpinResult.IsValidIndex(firstIndex) && SlotSpinResult.IsValidIndex(secondIndex))
+            {
+                (_againMarks[firstIndex], _againMarks[secondIndex]) =
+                    (_againMarks[secondIndex], _againMarks[firstIndex]);
+            }
+
             return true;
         }
 
@@ -113,6 +137,14 @@ namespace SlotRogue.Slot.ViewModels
             CurrentSpinResult = spinResult ?? throw new ArgumentNullException(nameof(spinResult));
             ClearResolvedResult();
             PublishState();
+        }
+
+        private void ClearAgainMarks()
+        {
+            for (int index = 0; index < _againMarks.Length; index++)
+            {
+                _againMarks[index] = false;
+            }
         }
 
         private void ClearResolvedResult()
@@ -175,6 +207,7 @@ namespace SlotRogue.Slot.ViewModels
                 best.CalculatedValue);
         }
 
+        private readonly bool[] _againMarks;
         private readonly SlotMachineService _slotMachineService;
         private readonly SlotPatternResolver _patternResolver;
         private readonly SlotResultCalculator _resultCalculator;

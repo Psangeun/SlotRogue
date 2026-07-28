@@ -18,6 +18,12 @@ namespace SlotRogue.UI.GameFlow
         private readonly SlotPresentationManager _presentationManager;
         private readonly Func<string, Sprite> _relicIconResolver;
 
+        internal event Action<SlotPatternPresentationResult> PatternPresentationStarted;
+
+        internal event Action<SlotPatternPresentationResult> PatternPresentationCompleted;
+
+        internal event Action LeverRaiseStarted;
+
         internal SlotTurnController(
             SlotMachineModel slotViewModel,
             RunBattleSpinSequence spinSequence,
@@ -83,6 +89,19 @@ namespace SlotRogue.UI.GameFlow
             }
         }
 
+        // 스핀 생성 직후 상위 레이어가 계산한 "다시" 표식을 모델에 주입하고 릴에 아이콘을 표시한다.
+        internal void ApplyAgainMarks(IReadOnlyList<bool> marks)
+        {
+            _slotViewModel.SetAgainMarks(marks);
+            _presentationManager?.ShowAgainMarks(_slotViewModel.CurrentAgainMarks);
+        }
+
+        // 스왑으로 표식이 심볼을 따라 이동한 뒤, 현재 모델 표식을 릴 아이콘에 다시 반영한다.
+        internal void RefreshAgainMarks()
+        {
+            _presentationManager?.ShowAgainMarks(_slotViewModel.CurrentAgainMarks);
+        }
+
         internal bool TrySwapCurrentSpinResult(
             int firstIndex,
             int secondIndex,
@@ -125,6 +144,7 @@ namespace SlotRogue.UI.GameFlow
             SlotTurnResult slotTurnResult,
             RelicResolveResult relicResult,
             RunCombatRequestResult combatRequestResult,
+            RelicSpecResolveResult specResult,
             CancellationToken cancellationToken)
         {
             if (_presentationManager == null)
@@ -134,13 +154,35 @@ namespace SlotRogue.UI.GameFlow
             }
 
             SlotPresentationResult presentationResult =
-                BuildPresentationResult(slotTurnResult, relicResult, combatRequestResult);
+                BuildPresentationResult(slotTurnResult, relicResult, combatRequestResult, specResult);
             bool presentationDone = false;
-            _presentationManager.PlayResolved(presentationResult, _ => presentationDone = true);
 
-            await UniTask.WaitUntil(
-                () => presentationDone,
-                cancellationToken: cancellationToken);
+            void HandlePatternStepStarted(SlotPatternPresentationResult pattern)
+            {
+                PatternPresentationStarted?.Invoke(pattern);
+            }
+
+            void HandlePatternStepCompleted(SlotPatternPresentationResult pattern)
+            {
+                PatternPresentationCompleted?.Invoke(pattern);
+            }
+
+            _presentationManager.PatternStepStarted += HandlePatternStepStarted;
+            _presentationManager.PatternStepCompleted += HandlePatternStepCompleted;
+            try
+            {
+                _presentationManager.PlayResolved(presentationResult, _ => presentationDone = true);
+
+                await UniTask.WaitUntil(
+                    () => presentationDone,
+                    cancellationToken: cancellationToken);
+            }
+            finally
+            {
+                _presentationManager.PatternStepStarted -= HandlePatternStepStarted;
+                _presentationManager.PatternStepCompleted -= HandlePatternStepCompleted;
+                PatternPresentationCompleted?.Invoke(null);
+            }
         }
 
         internal async UniTask BeforeBattleEventPresentedAsync(
@@ -150,7 +192,7 @@ namespace SlotRogue.UI.GameFlow
         {
             if (ShouldRaiseLeverBeforeEvent(combatEvent))
             {
-                await _spinSequence.RaiseLeverIfNeededAsync();
+                await RaiseLeverForTurnAsync();
             }
         }
 
@@ -161,7 +203,7 @@ namespace SlotRogue.UI.GameFlow
         {
             if (IsLastPlayerAttackPresentation(combatEvent, eventIndex, events))
             {
-                await _spinSequence.RaiseLeverIfNeededAsync();
+                await RaiseLeverForTurnAsync();
             }
         }
 
@@ -170,37 +212,103 @@ namespace SlotRogue.UI.GameFlow
             _spinSequence.ResetImmediate();
         }
 
+        private async UniTask RaiseLeverForTurnAsync()
+        {
+            if (_spinSequence.LeverRaised)
+            {
+                return;
+            }
+
+            LeverRaiseStarted?.Invoke();
+            await _spinSequence.RaiseLeverIfNeededAsync();
+        }
+
         private SlotPresentationResult BuildPresentationResult(
             SlotTurnResult slotTurnResult,
             RelicResolveResult relicResult,
-            RunCombatRequestResult combatRequestResult)
+            RunCombatRequestResult combatRequestResult,
+            RelicSpecResolveResult specResult)
         {
             IReadOnlyList<SlotPatternMatch> matches = slotTurnResult.PatternMatches;
-            var patternPresentations = new SlotPatternPresentationResult[matches.Count];
+            IReadOnlyList<bool> againMarks = slotTurnResult.AgainMarks;
+            int[] retriggerRepeatCounts = BuildRetriggerRepeatCounts(specResult, matches.Count);
+            int retriggerRepeatTotal = Sum(retriggerRepeatCounts);
+            var patternPresentations =
+                new List<SlotPatternPresentationResult>(matches.Count + retriggerRepeatTotal);
+
+            // "다시" 반복 연출의 sfxLevel은 유물 매칭(TriggerPatternIndex 0..matches.Count-1, -1)과
+            // 겹치지 않도록 matches.Count 이상에서 부여한다(반복엔 유물이 붙지 않음).
+            int repeatSfxLevel = matches.Count;
 
             for (int index = 0; index < matches.Count; index++)
             {
                 SlotPatternMatch match = matches[index];
                 var cellIndices = new int[match.MatchedCells.Count];
+                int againInPattern = 0;
 
                 for (int cellIndex = 0; cellIndex < match.MatchedCells.Count; cellIndex++)
                 {
                     SlotCell cell = match.MatchedCells[cellIndex];
-                    cellIndices[cellIndex] = SlotSpinResult.ToIndex(cell.Col, cell.Row);
+                    int flatIndex = SlotSpinResult.ToIndex(cell.Col, cell.Row);
+                    cellIndices[cellIndex] = flatIndex;
+                    if (againMarks != null && flatIndex < againMarks.Count && againMarks[flatIndex])
+                    {
+                        againInPattern++;
+                    }
                 }
 
-                patternPresentations[index] = new SlotPatternPresentationResult(
+                int row = match.MatchedCells.Count > 0 ? match.MatchedCells[0].Row : -1;
+                int col = match.MatchedCells.Count > 0 ? match.MatchedCells[0].Col : -1;
+                bool isFinale = match.Definition.IsJackpot;
+                string countText = $"{match.Symbol} x{match.MatchedCells.Count} / x{match.Multiplier:0.0}";
+                string bonusText = $"+{match.CalculatedValue} DMG";
+
+                patternPresentations.Add(new SlotPatternPresentationResult(
                     match.PresentationTitle,
                     match.Symbol,
-                    match.MatchedCells.Count > 0 ? match.MatchedCells[0].Row : -1,
-                    match.MatchedCells.Count > 0 ? match.MatchedCells[0].Col : -1,
+                    row,
+                    col,
                     match.MatchedCells.Count,
                     cellIndices,
-                    $"{match.Symbol} x{match.MatchedCells.Count} / x{match.Multiplier:0.0}",
-                    $"+{match.CalculatedValue} DMG",
-                    match.Definition.IsJackpot,
+                    countText,
+                    bonusText,
+                    isFinale,
                     index,
-                    match.CalculatedValue);
+                    match.CalculatedValue));
+
+                // 이 족보에 든 "다시" 표식 수만큼 같은 족보 연출을 이어서 한 번 더 재생한다.
+                for (int repeat = 0; repeat < againInPattern; repeat++)
+                {
+                    patternPresentations.Add(new SlotPatternPresentationResult(
+                        $"{match.PresentationTitle} 다시!",
+                        match.Symbol,
+                        row,
+                        col,
+                        match.MatchedCells.Count,
+                        cellIndices,
+                        countText,
+                        bonusText,
+                        isFinale,
+                        repeatSfxLevel++,
+                        match.CalculatedValue));
+                }
+
+                int retriggerInPattern = retriggerRepeatCounts[index];
+                for (int repeat = 0; repeat < retriggerInPattern; repeat++)
+                {
+                    patternPresentations.Add(new SlotPatternPresentationResult(
+                        $"{match.PresentationTitle} 한번 더!",
+                        match.Symbol,
+                        row,
+                        col,
+                        match.MatchedCells.Count,
+                        cellIndices,
+                        countText,
+                        bonusText,
+                        isFinale,
+                        repeatSfxLevel++,
+                        match.CalculatedValue));
+                }
             }
 
             SlotCombatRequest request =
@@ -224,6 +332,44 @@ namespace SlotRogue.UI.GameFlow
                 finalResult);
         }
 
+        private static int[] BuildRetriggerRepeatCounts(
+            RelicSpecResolveResult specResult,
+            int matchCount)
+        {
+            var counts = new int[matchCount];
+            IReadOnlyList<RelicPatternRepeat> repeats = specResult?.RetriggerPatternRepeats;
+            if (repeats == null || repeats.Count == 0)
+            {
+                return counts;
+            }
+
+            for (int index = 0; index < repeats.Count; index++)
+            {
+                RelicPatternRepeat repeat = repeats[index];
+                if (repeat.PatternIndex < 0 ||
+                    repeat.PatternIndex >= counts.Length ||
+                    repeat.Count <= 0)
+                {
+                    continue;
+                }
+
+                counts[repeat.PatternIndex] += repeat.Count;
+            }
+
+            return counts;
+        }
+
+        private static int Sum(IReadOnlyList<int> values)
+        {
+            int sum = 0;
+            for (int index = 0; index < values.Count; index++)
+            {
+                sum += values[index];
+            }
+
+            return sum;
+        }
+
         private SlotTurnResult BuildCurrentTurnResult(int spinCoinReward, int runCoinsAfterReward)
         {
             return new SlotTurnResult(
@@ -233,7 +379,8 @@ namespace SlotRogue.UI.GameFlow
                 _slotViewModel.CurrentCombatRequest,
                 spinCoinReward,
                 runCoinsAfterReward,
-                _slotViewModel.IsCurrentSpinResolved);
+                _slotViewModel.IsCurrentSpinResolved,
+                CopyAgainMarks());
         }
 
         private SlotTurnResult BuildCurrentPreviewTurnResult(int spinCoinReward, int runCoinsAfterReward)
@@ -245,7 +392,20 @@ namespace SlotRogue.UI.GameFlow
                 SlotCombatRequest.Empty,
                 spinCoinReward,
                 runCoinsAfterReward,
-                isResolved: false);
+                isResolved: false,
+                againMarks: CopyAgainMarks());
+        }
+
+        private bool[] CopyAgainMarks()
+        {
+            IReadOnlyList<bool> marks = _slotViewModel.CurrentAgainMarks;
+            var copy = new bool[marks.Count];
+            for (int index = 0; index < marks.Count; index++)
+            {
+                copy[index] = marks[index];
+            }
+
+            return copy;
         }
 
         private SlotRelicTriggerPresentationResult[] BuildRelicPresentations(
@@ -457,7 +617,8 @@ namespace SlotRogue.UI.GameFlow
             SlotCombatRequest baseCombatRequest,
             int spinCoinReward = 0,
             int runCoinsAfterReward = 0,
-            bool isResolved = true)
+            bool isResolved = true,
+            IReadOnlyList<bool> againMarks = null)
         {
             SpinResult = spinResult;
             PatternMatches = patternMatches;
@@ -466,11 +627,15 @@ namespace SlotRogue.UI.GameFlow
             SpinCoinReward = Math.Max(0, spinCoinReward);
             RunCoinsAfterReward = Math.Max(0, runCoinsAfterReward);
             IsResolved = isResolved;
+            AgainMarks = againMarks ?? Array.Empty<bool>();
         }
 
         internal SlotSpinResult SpinResult { get; }
 
         internal IReadOnlyList<SlotPatternMatch> PatternMatches { get; }
+
+        /// <summary>현재 보드 셀별 "다시" 표식(5x3 셀 인덱스 순). 스왑을 반영한 최신 상태다.</summary>
+        internal IReadOnlyList<bool> AgainMarks { get; }
 
         internal SlotPatternResult PatternResult { get; }
 

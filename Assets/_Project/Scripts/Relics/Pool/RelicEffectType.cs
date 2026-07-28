@@ -1,10 +1,9 @@
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// v23 유물 풀이 사용하는 효과 종류. 효과 실행은 문자열이 아니라 이 enum으로 분기한다.
+    /// 구 RelicDefinition 경로가 사용하는 효과 종류. v30 카탈로그의 복합 효과는 RelicSpec/RelicEffectKind 경로에서 처리한다.
     ///
-    /// Phase 1 실행 대상: AddDamage / AddBlock / Heal과 지원 상태 효과.
-    /// 그 외는 카탈로그에 등록만 하고 Phase 1 보상풀에서는 제외한다(미구현).
+    /// 단순 수치/상태 효과는 RelicEffectRunner가 직접 처리하고, Special 계열은 RelicSpecRunner 결과로 소비한다.
     /// </summary>
     public enum RelicEffectType
     {
@@ -17,7 +16,7 @@ namespace SlotRogue.Relics.Pool
         /// <summary>감염 부여.</summary>
         ApplyInfect = 4,
 
-        // ── Phase 2 (등록만, 미실행) ────────────────────────────────────
+        // ── 구 정의 호환 효과 ───────────────────────────────────────────
         ModifyDamageMultiplier = 100, // 배율 증폭(패시브/조건부)
         AmplifyStatus = 101,          // 상태이상 부여량/상한 증가
         AddRewardChoice = 102,        // 보상 선택지 +1

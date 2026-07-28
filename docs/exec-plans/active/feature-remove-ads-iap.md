@@ -15,7 +15,7 @@
 - [x] ADR-0015와 광고 제거 IAP 설계 문서 작성 — Codex
 - [x] `AdsRemoveState`와 PlayerPrefs 로컬 캐시 구현 — Codex
 - [x] Codeless IAP 및 Store 복원용 fulfillment 경계 구현 — Codex
-- [x] 부활/리롤/추가 보상/보상 2배 광고 스킵과 문구 연결 — Codex
+- [x] 부활/리롤/추가 보상/보상 2배/전투 상점 별조각 광고 스킵과 동일 횟수 제한 연결 — Codex
 - [x] EditMode 테스트 추가와 UI/테스트 어셈블리 컴파일 검증 — Codex
 - [x] Unity Product Catalog에 `remove_ads` Non-Consumable 등록 — Codex
 - [x] GameStart 광고 제거 구매 버튼 씬 직렬화와 Codeless IAP Inspector 이벤트 연결 — Codex

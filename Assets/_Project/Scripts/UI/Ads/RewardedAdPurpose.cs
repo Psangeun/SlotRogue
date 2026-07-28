@@ -6,5 +6,6 @@ namespace SlotRogue.UI.Ads
         RewardReroll = 1,
         ExtraReward = 2,
         RewardDouble = 3,
+        ShopStarFragment = 4,
     }
 }

@@ -276,7 +276,7 @@ namespace SlotRogue.UI.GameFlow
             switch (requirement)
             {
                 case EnemyStatusRequirement.Any:
-                    // v23 U-13은 화상/감염/취약/약화만 대상으로 하며 Freeze는 포함하지 않는다.
+                    // Any 상태 조건은 현재 런타임에서 추적하는 화상/감염만 대상으로 한다.
                     return context.EnemyHasBurn || context.EnemyHasInfect;
                 case EnemyStatusRequirement.Burn:
                     return context.EnemyHasBurn;

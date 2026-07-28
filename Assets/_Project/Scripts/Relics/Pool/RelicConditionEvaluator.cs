@@ -15,7 +15,11 @@ namespace SlotRogue.Relics.Pool
             int coinCount,
             int turnIndex,
             bool isFirstSpinOfBattle,
-            int activePatternCount)
+            int activePatternCount,
+            bool enemyHasBurn = false,
+            bool enemyHasInfection = false,
+            bool enemyHasVulnerable = false,
+            bool enemyHasWeaken = false)
         {
             SwappedThisSpin = swappedThisSpin;
             SwappedThisBattle = swappedThisBattle;
@@ -23,6 +27,10 @@ namespace SlotRogue.Relics.Pool
             TurnIndex = turnIndex;
             IsFirstSpinOfBattle = isFirstSpinOfBattle;
             ActivePatternCount = activePatternCount;
+            EnemyHasBurn = enemyHasBurn;
+            EnemyHasInfection = enemyHasInfection;
+            EnemyHasVulnerable = enemyHasVulnerable;
+            EnemyHasWeaken = enemyHasWeaken;
         }
 
         public bool SwappedThisSpin { get; }
@@ -36,6 +44,33 @@ namespace SlotRogue.Relics.Pool
 
         /// <summary>이번 스핀에 발동한 족보 수.</summary>
         public int ActivePatternCount { get; }
+
+        public bool EnemyHasBurn { get; }
+
+        public bool EnemyHasInfection { get; }
+
+        public bool EnemyHasVulnerable { get; }
+
+        public bool EnemyHasWeaken { get; }
+
+        public bool EnemyHasStatus(RelicEnemyStatusCondition status)
+        {
+            switch (status)
+            {
+                case RelicEnemyStatusCondition.Any:
+                    return EnemyHasBurn || EnemyHasInfection || EnemyHasVulnerable || EnemyHasWeaken;
+                case RelicEnemyStatusCondition.Burn:
+                    return EnemyHasBurn;
+                case RelicEnemyStatusCondition.Infection:
+                    return EnemyHasInfection;
+                case RelicEnemyStatusCondition.Vulnerable:
+                    return EnemyHasVulnerable;
+                case RelicEnemyStatusCondition.Weaken:
+                    return EnemyHasWeaken;
+                default:
+                    return false;
+            }
+        }
     }
 
     /// <summary>
@@ -51,13 +86,15 @@ namespace SlotRogue.Relics.Pool
             int size,
             bool madeBySwap,
             bool wholeLineSameSymbol,
-            int baseDamage = 0)
+            int baseDamage = 0,
+            int againMarkCount = 0)
         {
             Symbol = symbol;
             Size = size;
             MadeBySwap = madeBySwap;
             WholeLineSameSymbol = wholeLineSameSymbol;
             BaseDamage = baseDamage;
+            AgainMarkCount = againMarkCount < 0 ? 0 : againMarkCount;
             HasPattern = size > 0;
         }
 
@@ -70,8 +107,11 @@ namespace SlotRogue.Relics.Pool
         public bool MadeBySwap { get; }
         public bool WholeLineSameSymbol { get; }
 
-        /// <summary>이 족보의 기본 피해(배율 적용 전). 배율 피해 모델(P2)에서 족보별로 곱한다.</summary>
+        /// <summary>이 족보의 기본 피해(배율 적용 전). 배율 피해 모델에서 족보별로 곱한다.</summary>
         public int BaseDamage { get; }
+
+        /// <summary>이 족보에 포함된 "다시"(Again) 표식 셀 수. 그 수만큼 이 족보가 추가로 발동한다.</summary>
+        public int AgainMarkCount { get; }
     }
 
     /// <summary>유물 조건(AND)을 런타임 상태·족보에 대해 평가한다. 순수 함수(부작용 없음).</summary>
@@ -131,6 +171,8 @@ namespace SlotRogue.Relics.Pool
                     return context.CoinCount >= condition.Value;
                 case RelicConditionKind.ActivePatternCountAtLeast:
                     return context.ActivePatternCount >= condition.Value;
+                case RelicConditionKind.EnemyHasStatus:
+                    return context.EnemyHasStatus((RelicEnemyStatusCondition)condition.Value);
                 default:
                     return false;
             }

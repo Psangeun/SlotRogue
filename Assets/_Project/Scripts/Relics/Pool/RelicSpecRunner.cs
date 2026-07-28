@@ -1,14 +1,15 @@
+using System;
 using System.Collections.Generic;
+using SlotRogue.Slot.Data;
 
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// 보유 v29 유물(<see cref="RelicSpec"/>)을 트리거별로 실행하는 엔진. 데이터(부품)를 읽어 값만 만들고
+    /// 보유 v30 유물(<see cref="RelicSpec"/>)을 트리거별로 실행하는 엔진. 데이터(부품)를 읽어 값만 만들고
     /// 전투/경제 코어는 건드리지 않는다(순수 함수). 조건 판정은 <see cref="RelicConditionEvaluator"/>에 위임.
     ///
-    /// P1 슬라이스: <see cref="RelicTrigger.OnDamageResolve"/>만 처리한다. 나머지 트리거
-    /// (전투 시작/처치/별조각/치명/스핀 생성/규칙)와 특수 규칙(<see cref="RelicEffectKind.SpecialRule"/>)은
-    /// 후속 슬라이스에서 각 훅에 배선한다.
+    /// 피해 정산, 스핀 생성, 전투 이벤트, 상시 규칙 보정을 런/전투 훅에서 호출할 수 있게
+    /// 순수 계산 결과로 돌려준다.
     /// </summary>
     public static class RelicSpecRunner
     {
@@ -86,8 +87,8 @@ namespace SlotRogue.Relics.Pool
                             statusRequests.Add(new RelicSpecStatusRequest(effect.Kind, (int)effect.Value1));
                             break;
                         default:
-                            // GainCoins/PayHp/SymbolBaseDelta/AddAgainMark/SwapCountDelta/Shop*/
-                            // SurviveLethal/Retrigger*/SpecialRule 등은 다른 트리거/후속 슬라이스에서 처리.
+                            // GainCoins/AddAgainMark/SwapCountDelta/Shop*/SurviveLethal/Retrigger* 등은
+                            // 전용 계산 경로나 다른 트리거 훅에서 처리.
                             break;
                     }
                 }
@@ -102,9 +103,101 @@ namespace SlotRogue.Relics.Pool
             }
 
             int multipliedBaseDamage = ComputeMultipliedBaseDamage(owned, context, patterns);
+            IReadOnlyList<RelicPatternRepeat> retriggerPatternRepeats =
+                ComputeRetriggerPatternRepeats(owned, context, patterns);
             return new RelicSpecResolveResult(
                 multipliedBaseDamage, flatDamage, heal, comboMultAdd, specialMult, finalMult,
-                incomingDamageMul, contributions, statusRequests);
+                incomingDamageMul, contributions, statusRequests, retriggerPatternRepeats);
+        }
+
+        /// <summary>
+        /// 스핀 보드를 만들 때 보유 유물/제안의 <see cref="RelicTrigger.OnSpinGenerate"/> +
+        /// <see cref="RelicEffectKind.AddAgainMark"/> 효과를 적용해 어느 칸에 "다시" 표식이 붙는지 계산한다.
+        /// 심볼 필터(예: R-04 세븐)와 확률(예: R-06 각 칸 12%)을 데이터대로 해석한다.
+        /// </summary>
+        /// <param name="owned">보유 유물/제안 명세(트리거 무관, null 허용).</param>
+        /// <param name="board">이번 스핀 보드 심볼(5x3 셀 인덱스 순서).</param>
+        /// <param name="rng">확률 판정용 난수원(null이면 확률 효과는 발동하지 않음).</param>
+        /// <returns>셀별 표식 여부 배열(board와 같은 길이). owned/board가 비면 모두 false.</returns>
+        public static bool[] ResolveAgainMarks(
+            IReadOnlyList<RelicSpec> owned,
+            IReadOnlyList<SlotSymbolType> board,
+            Random rng)
+        {
+            int cellCount = board?.Count ?? 0;
+            var marks = new bool[cellCount];
+            if (owned == null || owned.Count == 0 || cellCount == 0)
+            {
+                return marks;
+            }
+
+            for (int index = 0; index < owned.Count; index++)
+            {
+                RelicSpec spec = owned[index];
+                if (spec == null || spec.Trigger != RelicTrigger.OnSpinGenerate)
+                {
+                    continue;
+                }
+
+                IReadOnlyList<RelicEffect> effects = spec.Effects;
+                for (int effectIndex = 0; effectIndex < effects.Count; effectIndex++)
+                {
+                    RelicEffect effect = effects[effectIndex];
+                    if (effect.Kind != RelicEffectKind.AddAgainMark)
+                    {
+                        continue;
+                    }
+
+                    ApplyAgainMarkEffect(effect, board, rng, marks);
+                }
+            }
+
+            return marks;
+        }
+
+        private static void ApplyAgainMarkEffect(
+            in RelicEffect effect,
+            IReadOnlyList<SlotSymbolType> board,
+            Random rng,
+            bool[] marks)
+        {
+            IReadOnlyList<SlotSymbolType> symbolFilter = effect.Symbols;
+            bool hasFilter = symbolFilter != null && symbolFilter.Count > 0;
+
+            for (int cell = 0; cell < marks.Length; cell++)
+            {
+                if (marks[cell])
+                {
+                    continue;
+                }
+
+                if (hasFilter && !ContainsSymbol(symbolFilter, board[cell]))
+                {
+                    continue;
+                }
+
+                if (effect.Chance >= 1f)
+                {
+                    marks[cell] = true;
+                }
+                else if (rng != null && effect.Chance > 0f && rng.NextDouble() < effect.Chance)
+                {
+                    marks[cell] = true;
+                }
+            }
+        }
+
+        private static bool ContainsSymbol(IReadOnlyList<SlotSymbolType> symbols, SlotSymbolType symbol)
+        {
+            for (int index = 0; index < symbols.Count; index++)
+            {
+                if (symbols[index] == symbol)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -221,8 +314,40 @@ namespace SlotRogue.Relics.Pool
             return sum;
         }
 
+        /// <summary>상시 적용되는 플레이어 받는 피해 배율을 계산한다(R-38 유리 대포 등).</summary>
+        public static float ResolveIncomingDamageMultiplier(IReadOnlyList<RelicSpec> owned)
+        {
+            if (owned == null || owned.Count == 0)
+            {
+                return 1f;
+            }
+
+            float multiplier = 1f;
+            for (int index = 0; index < owned.Count; index++)
+            {
+                RelicSpec spec = owned[index];
+                if (spec == null)
+                {
+                    continue;
+                }
+
+                IReadOnlyList<RelicEffect> effects = spec.Effects;
+                for (int effectIndex = 0; effectIndex < effects.Count; effectIndex++)
+                {
+                    RelicEffect effect = effects[effectIndex];
+                    if (effect.Kind == RelicEffectKind.IncomingDamageMul &&
+                        effect.Value1 > 0f)
+                    {
+                        multiplier *= effect.Value1;
+                    }
+                }
+            }
+
+            return multiplier;
+        }
+
         /// <summary>
-        /// 배율 피해 모델(P2). 족보별로 base × (1 + ΣComboMultAdd) × ΠSpecialMultTimes 를 계산해 합산하고,
+        /// 배율 피해 모델. 족보별로 base × (1 + ΣComboMultAdd) × ΠSpecialMultTimes 를 계산해 합산하고,
         /// 전체에 최종 배율(FinalMultTimes)을 곱한다. 각 배율은 "그 족보 조건을 만족하는 유물"만 적용하므로
         /// 애그리게이트(전 족보 일괄 곱) 붕괴를 피한다. 배율 유물이 없으면 원래 기본 피해와 같다.
         /// </summary>
@@ -238,12 +363,40 @@ namespace SlotRogue.Relics.Pool
 
             float sumRaw = 0f;
             float maxRaw = 0f;
+            float againRaw = 0f;
             for (int patternIndex = 0; patternIndex < patterns.Count; patternIndex++)
             {
                 RelicPatternView pattern = patterns[patternIndex];
-                float comboAdd = 0f;
-                float specialMult = 1f;
+                float patternDamage = ComputePatternDamageRaw(owned, context, pattern);
+                sumRaw += patternDamage;
+                if (patternDamage > maxRaw)
+                {
+                    maxRaw = patternDamage;
+                }
 
+                // "다시" 표식: 이 족보에 든 표식 셀 수만큼 이 족보를 추가로 발동한다(RetriggerHighest와 무관).
+                againRaw += patternDamage * pattern.AgainMarkCount;
+            }
+
+            float finalMult = ComputeGlobalFinalMult(owned, context, patterns);
+            float baseTotal = sumRaw * finalMult;
+            float highest = maxRaw * finalMult;
+
+            float retriggerBonus = ComputeRetriggerBonus(owned, context, patterns, baseTotal, highest);
+            float againBonus = againRaw * finalMult;
+            return (int)System.Math.Round(baseTotal + retriggerBonus + againBonus);
+        }
+
+        private static float ComputePatternDamageRaw(
+            IReadOnlyList<RelicSpec> owned,
+            in RelicRuntimeContext context,
+            in RelicPatternView pattern)
+        {
+            float comboAdd = 0f;
+            float specialMult = 1f;
+
+            if (owned != null)
+            {
                 for (int relicIndex = 0; relicIndex < owned.Count; relicIndex++)
                 {
                     RelicSpec spec = owned[relicIndex];
@@ -268,21 +421,100 @@ namespace SlotRogue.Relics.Pool
                         }
                     }
                 }
+            }
 
-                float patternDamage = pattern.BaseDamage * (1f + comboAdd) * specialMult;
-                sumRaw += patternDamage;
-                if (patternDamage > maxRaw)
+            return pattern.BaseDamage * (1f + comboAdd) * specialMult;
+        }
+
+        private static IReadOnlyList<RelicPatternRepeat> ComputeRetriggerPatternRepeats(
+            IReadOnlyList<RelicSpec> owned,
+            in RelicRuntimeContext context,
+            IReadOnlyList<RelicPatternView> patterns)
+        {
+            int patternCount = patterns?.Count ?? 0;
+            if (owned == null || owned.Count == 0 || patternCount == 0)
+            {
+                return Array.Empty<RelicPatternRepeat>();
+            }
+
+            int highestPatternIndex = FindHighestPatternIndex(owned, context, patterns);
+            var repeatCounts = new int[patternCount];
+
+            for (int relicIndex = 0; relicIndex < owned.Count; relicIndex++)
+            {
+                RelicSpec spec = owned[relicIndex];
+                if (spec == null || spec.Trigger != RelicTrigger.OnDamageResolve)
                 {
-                    maxRaw = patternDamage;
+                    continue;
+                }
+
+                bool retriggerAll = HasEffect(spec, RelicEffectKind.RetriggerAllPatterns);
+                bool retriggerHighest = HasEffect(spec, RelicEffectKind.RetriggerHighestPattern);
+                if (!retriggerAll && !retriggerHighest)
+                {
+                    continue;
+                }
+
+                if (spec.Lifetime.Kind == RelicLifetimeKind.OncePerBattle &&
+                    !context.IsFirstSpinOfBattle)
+                {
+                    continue;
+                }
+
+                if (!SpecApplies(spec, context, patterns))
+                {
+                    continue;
+                }
+
+                if (retriggerAll)
+                {
+                    for (int patternIndex = 0; patternIndex < repeatCounts.Length; patternIndex++)
+                    {
+                        repeatCounts[patternIndex]++;
+                    }
+                }
+                else if (highestPatternIndex >= 0)
+                {
+                    repeatCounts[highestPatternIndex]++;
                 }
             }
 
-            float finalMult = ComputeGlobalFinalMult(owned, context, patterns);
-            float baseTotal = sumRaw * finalMult;
-            float highest = maxRaw * finalMult;
+            return BuildPatternRepeats(repeatCounts);
+        }
 
-            float retriggerBonus = ComputeRetriggerBonus(owned, context, patterns, baseTotal, highest);
-            return (int)System.Math.Round(baseTotal + retriggerBonus);
+        private static int FindHighestPatternIndex(
+            IReadOnlyList<RelicSpec> owned,
+            in RelicRuntimeContext context,
+            IReadOnlyList<RelicPatternView> patterns)
+        {
+            int highestIndex = -1;
+            float highestDamage = float.MinValue;
+            for (int patternIndex = 0; patternIndex < patterns.Count; patternIndex++)
+            {
+                float patternDamage = ComputePatternDamageRaw(owned, context, patterns[patternIndex]);
+                if (highestIndex < 0 || patternDamage > highestDamage)
+                {
+                    highestIndex = patternIndex;
+                    highestDamage = patternDamage;
+                }
+            }
+
+            return highestIndex;
+        }
+
+        private static IReadOnlyList<RelicPatternRepeat> BuildPatternRepeats(int[] repeatCounts)
+        {
+            var repeats = new List<RelicPatternRepeat>();
+            for (int patternIndex = 0; patternIndex < repeatCounts.Length; patternIndex++)
+            {
+                int count = repeatCounts[patternIndex];
+                if (count > 0)
+                {
+                    repeats.Add(new RelicPatternRepeat(patternIndex, count));
+                }
+            }
+
+            return repeats.Count == 0 ? Array.Empty<RelicPatternRepeat>() : repeats;
         }
 
         /// <summary>

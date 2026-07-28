@@ -13,25 +13,19 @@ namespace SlotRogue.UI.RunGame
         private readonly Image _icon;
         private readonly TMP_Text _nameText;
         private readonly TMP_Text _descriptionText;
-        private readonly Text _legacyText;
-        private readonly GameObject _highlight;
 
         private RunInventoryCell(
             GameObject root,
             Button button,
             Image icon,
             TMP_Text nameText,
-            TMP_Text descriptionText,
-            Text legacyText,
-            GameObject highlight)
+            TMP_Text descriptionText)
         {
             _root = root;
             _button = button;
             _icon = icon;
             _nameText = nameText;
             _descriptionText = descriptionText;
-            _legacyText = legacyText;
-            _highlight = highlight;
         }
 
         internal static RunInventoryCell Resolve(GameObject root)
@@ -42,7 +36,7 @@ namespace SlotRogue.UI.RunGame
                 Debug.LogError(
                     "[RunInventoryCell] RunInventoryCellView must be attached to the cell prefab root.",
                     root);
-                return new RunInventoryCell(root, null, null, null, null, null, null);
+                return new RunInventoryCell(root, null, null, null, null);
             }
 
             view.ValidateRequiredReferences();
@@ -52,9 +46,7 @@ namespace SlotRogue.UI.RunGame
                 view.Button,
                 view.Icon,
                 view.NameText,
-                view.DescriptionText,
-                view.LegacyText,
-                view.Highlight);
+                view.DescriptionText);
         }
 
         internal void SetActive(bool active)
@@ -105,10 +97,6 @@ namespace SlotRogue.UI.RunGame
             {
                 _descriptionText.text = combined;
             }
-            else if (_legacyText != null)
-            {
-                _legacyText.text = combined;
-            }
         }
 
         internal void ApplyRelicDescriptionSpriteAsset(
@@ -126,14 +114,6 @@ namespace SlotRogue.UI.RunGame
             }
 
             spriteAssetBinder.ApplyTo(_nameText);
-        }
-
-        internal void SetHighlight(bool on)
-        {
-            if (_highlight != null)
-            {
-                _highlight.SetActive(on);
-            }
         }
 
         internal void SetClick(Action action)

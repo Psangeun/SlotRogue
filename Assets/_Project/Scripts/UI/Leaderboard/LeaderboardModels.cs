@@ -23,7 +23,7 @@ namespace SlotRogue.UI.Leaderboard
     public sealed class LeaderboardSymbolCount
     {
         public string Symbol;
-        public int Count;
+        public float Count;
 
         public LeaderboardSymbolCount()
         {
@@ -31,10 +31,10 @@ namespace SlotRogue.UI.Leaderboard
             Count = 0;
         }
 
-        public LeaderboardSymbolCount(string symbol, int count)
+        public LeaderboardSymbolCount(string symbol, float count)
         {
             Symbol = symbol ?? string.Empty;
-            Count = Math.Max(0, count);
+            Count = Math.Max(0f, count);
         }
 
         public bool TryGetSymbol(out SlotSymbolType symbol)

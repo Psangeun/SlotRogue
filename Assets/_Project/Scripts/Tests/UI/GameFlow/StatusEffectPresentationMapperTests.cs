@@ -5,6 +5,7 @@ using SlotRogue.UI.Combat.Presentation;
 using SlotRogue.UI.GameFlow;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SlotRogue.UI.Tests.GameFlow
 {
@@ -129,10 +130,8 @@ namespace SlotRogue.UI.Tests.GameFlow
         public void PlayerStatusPanel_RenderPositionsBuffsFromTopAndDebuffsFromBottom()
         {
             const string PrefabPath = "Assets/_Project/Prefabs/UI/RunGame/Bottom Panel.prefab";
-            const string IconSetPath = "Assets/_Project/Data/UI/StatusEffectIconSet.asset";
 
             GameObject prefabRoot = PrefabUtility.LoadPrefabContents(PrefabPath);
-            PlayerStatusPanelView view = null;
             try
             {
                 RectTransform[] rectTransforms =
@@ -140,13 +139,13 @@ namespace SlotRogue.UI.Tests.GameFlow
                 RectTransform panelRoot = Array.Find(
                     rectTransforms,
                     rectTransform => rectTransform.name == "Player Stat Panel");
-                StatusEffectIconSet iconSet =
-                    AssetDatabase.LoadAssetAtPath<StatusEffectIconSet>(IconSetPath);
 
                 Assert.That(panelRoot, Is.Not.Null);
-                Assert.That(iconSet, Is.Not.Null);
 
-                view = new PlayerStatusPanelView(panelRoot, iconSet);
+                PlayerStatusPanelView view = panelRoot.GetComponent<PlayerStatusPanelView>();
+                Assert.That(view, Is.Not.Null);
+                Assert.That(view.EnsureReferences(), Is.True);
+
                 view.Render(new[]
                 {
                     new StatusEffectViewData(StatusEffectKind.Thorns, 3, showValue: true),
@@ -155,11 +154,15 @@ namespace SlotRogue.UI.Tests.GameFlow
                     new StatusEffectViewData(StatusEffectKind.Weaken, 2, showValue: true),
                 });
 
-                RectTransform firstBuff = (RectTransform)panelRoot.GetChild(0);
-                RectTransform secondBuff = (RectTransform)panelRoot.GetChild(1);
-                RectTransform firstDebuff = (RectTransform)panelRoot.GetChild(2);
-                RectTransform secondDebuff = (RectTransform)panelRoot.GetChild(3);
+                RectTransform firstBuff = FindSlotByText(panelRoot, "가시 3");
+                RectTransform secondBuff = FindSlotByText(panelRoot, "흡혈 1");
+                RectTransform firstDebuff = FindSlotByText(panelRoot, "감염 4");
+                RectTransform secondDebuff = FindSlotByText(panelRoot, "약화 2");
 
+                Assert.That(firstBuff, Is.Not.Null);
+                Assert.That(secondBuff, Is.Not.Null);
+                Assert.That(firstDebuff, Is.Not.Null);
+                Assert.That(secondDebuff, Is.Not.Null);
                 Assert.That(firstBuff.anchorMin.y, Is.EqualTo(1f));
                 Assert.That(firstBuff.anchoredPosition.y, Is.EqualTo(0f));
                 Assert.That(secondBuff.anchorMin.y, Is.EqualTo(1f));
@@ -168,12 +171,47 @@ namespace SlotRogue.UI.Tests.GameFlow
                 Assert.That(firstDebuff.anchoredPosition.y, Is.EqualTo(0f));
                 Assert.That(secondDebuff.anchorMin.y, Is.EqualTo(0f));
                 Assert.That(secondDebuff.anchoredPosition.y, Is.GreaterThan(0f));
+                Assert.That(firstBuff.GetComponentsInChildren<Image>(includeInactive: false), Has.Length.EqualTo(1));
+                Assert.That(firstDebuff.GetComponentsInChildren<Image>(includeInactive: false), Has.Length.EqualTo(1));
+                Assert.That(firstBuff.GetComponent<Image>().sprite.name, Is.EqualTo("ingame_statback_0"));
+                Assert.That(firstDebuff.GetComponent<Image>().sprite.name, Is.EqualTo("ingame_statback_1"));
             }
             finally
             {
-                view?.Dispose();
                 PrefabUtility.UnloadPrefabContents(prefabRoot);
             }
+        }
+
+        private static RectTransform FindSlotByText(RectTransform panelRoot, string text)
+        {
+            for (int index = 0; index < panelRoot.childCount; index++)
+            {
+                var child = (RectTransform)panelRoot.GetChild(index);
+                if (child.gameObject.activeSelf && GetFirstTmpText(child) == text)
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetFirstTmpText(RectTransform root)
+        {
+            Component[] components = root.GetComponentsInChildren<Component>(includeInactive: true);
+            for (int index = 0; index < components.Length; index++)
+            {
+                Component component = components[index];
+                if (component != null &&
+                    component.GetType().FullName == "TMPro.TextMeshProUGUI")
+                {
+                    return component.GetType()
+                        .GetProperty("text")
+                        ?.GetValue(component) as string;
+                }
+            }
+
+            return null;
         }
 
     }

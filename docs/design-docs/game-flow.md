@@ -1,11 +1,11 @@
 # 게임 플로우
 
 **Status**: draft  
-**Last updated**: 2026-07-02
+**Last updated**: 2026-07-28
 
 ## Purpose
 
-게임 시작부터 시작 유물 선택, 전투, 보상, 다음 전투로 이어지는 무한모드 playable loop를 만든다. 슬롯과 전투는 각자의 책임을 유지하고, 실제 연결은 UI/GameFlow 계층에서 수행한다.
+게임 시작부터 전투, 보상, 상점, 다음 전투로 이어지는 무한모드 playable loop를 만든다. 슬롯과 전투는 각자의 책임을 유지하고, 실제 연결은 UI/GameFlow 계층에서 수행한다.
 
 ## Decisions
 
@@ -14,11 +14,11 @@
 | F1 | [ADR-0002](../adr/0002-game-flow-is-scene-driven-ui-integration.md) | 씬 기반 플로우, 전투 비수정, UI/GameFlow 계층에서 슬롯 요청을 전투 Effect로 변환 |
 | F2 | 전투 코어 수정 금지 | `BattleSystem`, 전투 Dev 하네스, 전투 테스트는 그대로 두고 public API만 사용한다. |
 | F3 | 시작 유물은 프로토타입에서 비활성 | 스왑 프로토타입 런은 시작 유물 선택 없이 첫 전투로 진입한다. |
-| F4 | 보상은 v33 제안 3택 | 보상 씬은 v33 제안 42종 중 3개를 제시하고, 심볼 가중치·Base·별조각 계열은 즉시 런 상태에 반영한다. |
+| F4 | 보상은 v30 제안 3택 | 보상 씬은 v30 제안 최종안 34종 중 3개를 제시하고, 심볼 가중치·Base·별조각·엔진 효과 계열은 즉시 런 상태에 반영한다. |
 | F5 | v1 런은 WaveSchedule + EncounterTable 기반 | 맵 노드 선택은 사용하지 않지만, `WaveScheduleDefinition`으로 전투 tier/구간을 계산하고 `EncounterTable`에서 `MonsterDefinition` 편성을 선택해 다음 전투 roster를 생성한다. |
 | F6 | [ADR-0008](../adr/0008-ui-strict-mvvm-boundary.md) | UI는 strict MVVM을 따른다. View는 화면 상태 렌더링과 입력 event만 담당하고 SceneRoot가 순수 ViewModel 및 Flow Controller를 연결한다. |
 | F7 | 슬롯 결과 연출은 전투 적용 전 큐로 재생 | `RunGame` Battle 화면은 스핀 후 스왑 대기 중에는 매칭 preview만 표시하고, `ATTACK` 입력 뒤 슬롯 계산과 유물 후처리를 확정한다. `SlotPresentationManager`가 패턴 → 유물 → 최종 결과 연출을 완료한 뒤 전투 Effect를 적용한다. |
-| F8 | v33 제안/유물 프로토타입 | `RelicCatalog`는 v33 유물 44종 상점 데이터로 교체되었고, 전투 후 보상은 `RunRewardCatalog` v33 제안 42종을 사용한다. |
+| F8 | v30 제안/유물 프로토타입 | `RelicCatalog`는 v30 최종 유물 55종 상점 데이터로 교체되었고, 전투 후 보상은 `RunRewardCatalog` v30 제안 34종을 사용한다. |
 | F9 | [ADR-0014](../adr/0014-defeat-revive-window-and-relic-contribution.md) | 첫 패배는 5초 부활 유예 후 확정하고 최종 결과에 모든 보유 유물의 명목 기여량을 표시한다. |
 | F10 | [ADR-0017](../adr/0017-first-run-tutorial-run-game-mode.md) | 최초 튜토리얼은 별도 Scene 복제가 아니라 `RunGame` 튜토리얼 모드로 실행한다. |
 
@@ -32,7 +32,7 @@ RunGame / Battle
 ├─ Victory → RunGame / Reward → RunGame / Battle → ...
 └─ Defeat → RunGame / ReviveOffer
    ├─ Rewarded → RunGame / Battle
-   └─ Timeout/No reward → RunGame / RunResult → StartRelicSelect
+   └─ Timeout/No reward → RunGame / RunResult → GameStart
 ```
 
 전투는 별도 `RunBattle` 씬이 아니라 `RunGame` 씬 내부 `BattleView` 상태다. 승리 연출이 끝나면 추가 버튼 입력 없이 보상 상태로 자동 전환한다. 첫 패배이면서 부활권이 남아 있으면 패배 View가 5초간 몬스터 초상화·카운트다운·광고 부활 버튼을 표시한다. Rewarded 부활은 몬스터 상태와 행동 순서를 유지하고 플레이어 HP만 최대 HP의 절반으로 복구해 같은 전투를 재개한다. 시간 초과 또는 광고 보상 실패 뒤에 최종 결과를 확정하며, 결과 화면은 모든 보유 유물의 발동 횟수와 누적 피해·방어·회복 기여를 표시한다.
@@ -81,22 +81,24 @@ sequenceDiagram
 
 ### 시작 유물
 
-스왑 프로토타입 런은 시작 유물을 지급하지 않는다. `RunRewardService.IsStarterSelection`은 false이며, `RunGame` 단독 실행과 Title 경유 실행 모두 첫 화면을 전투로 둔다. 기존 v23 시작 유물 S-01~S-06은 v33 유물 교체 범위에서 런타임 카탈로그에 남기지 않는다.
+스왑 프로토타입 런은 시작 유물을 지급하지 않는다. `RunRewardService.IsStarterSelection`은 false이며, `RunGame` 단독 실행과 Title 경유 실행 모두 첫 화면을 전투로 둔다. 기존 v23 시작 유물 S-01~S-06은 v30 상점형 유물 교체 범위에서 런타임 카탈로그에 남기지 않는다.
 
 ### 보상
 
-전투 승리 후 `RewardPanel 1`을 우선 탐색해 `RunRewardView`로 등록하고, v33 제안 기획서 42종 중 중복 없는 3종을 제시한다. 튜토리얼 첫 전투 승리도 프로토타입 검증을 위해 일반 런으로 전환한 뒤 같은 제안 화면으로 진입한다. 전투 등급별 보상 풀 분리는 아직 적용하지 않으며 모든 전투 등급이 같은 제안 풀을 사용한다.
+전투 승리 후 `RewardPanel 1`을 우선 탐색해 `RunRewardView`로 등록하고, v30 제안 최종안 34종 중 중복 없는 3종을 제시한다. 튜토리얼 첫 전투 승리도 프로토타입 검증을 위해 일반 런으로 전환한 뒤 같은 제안 화면으로 진입한다. 전투 등급별 보상 풀 분리는 아직 적용하지 않으며 모든 전투 등급이 같은 제안 풀을 사용한다.
 
 | 제안 계열 | 현재 적용 |
 |-----------|-----------|
 | 심볼 가중치 | `GameFlowSession.SlotPool`에 즉시 반영 |
 | 심볼 Base 피해 | `SlotSymbolAttackValues` 런 보너스로 즉시 반영 |
 | 별조각 | `GameFlowSession.RunCoins`에 즉시 반영 |
-| 배율/다시/상태/위험 계약 | 선택 기록만 남김. 전투 수식 연결은 후속 범위 |
+| 배율/다시/상태/위험 계약 | `RelicSpecRunner` 스펙으로 저장하고 전투 수식·상태 요청에 직접 반영 |
 
-상점 유물은 전투 중 `ShopPanel`에서 별조각으로 구매한다. 상점 패널은 기본적으로 닫혀 있고, 전투 화면의 상점 버튼을 눌렀을 때만 열린다. `ShopPanel` 하위 `GameFlowOptionView` 카드 5개를 상점 슬롯으로 직접 렌더링하며, 구매 가격은 v33 유물 기획서의 `price` 필드를 사용하고 리롤은 별조각 1개다. `R-01` 같은 즉시 지급 유물은 구매 즉시 별조각을 지급하고 인벤토리에 남기지 않는다. 심볼 Base 증가, 전투당 스왑 횟수 증가, 전투 시작 별조각 지급처럼 현재 엔진에 바로 연결 가능한 유물 효과는 런 상태에 반영한다. 배율/다시/저주 수식은 보유 유물로 표시하며 전투 계산 연결은 후속 범위다.
+심볼 가중치 제안은 확률을 직접 저장하거나 증감하지 않는다. 증가 제안은 대상 심볼의 현재 float 가중치에 v30 고정 수치(체리/레몬 `+0.3f`, 종/클로버/다이아 `+0.2f`, 세븐 `+0.1f`)를 더하고, 감소/절반 제안은 현재 가중치에 `0.5f`를 곱한다. 적용 순서는 선택 획득 순서를 그대로 따르며, 저장/복원은 정규화 확률이 아니라 최종 float 가중치 스냅샷을 보존한다.
 
-보상/상점 아이콘은 기존 Addressable `Symbol Sheet Highlight`와 `Relic Sheet Highlight` 캐시를 사용한다. 심볼 제안은 해당 심볼 아이콘을, 경제/상점/상태/위험 제안은 대표 유물 아이콘을 사용한다.
+상점 유물은 전투 중 `ShopPanel`에서 별조각으로 구매한다. 상점 패널은 기본적으로 닫혀 있고, 전투 화면의 상점 버튼을 눌렀을 때만 열린다. `ShopPanel` 하위 `GameFlowOptionView` 카드 3개를 상점 슬롯으로 직접 렌더링하며, 구매 가격은 v30 최종 HTML의 `price` 필드를 사용하고 리롤은 별조각 1개다. `Ad Button`은 wave당 최대 2회 사용할 수 있고 reward callback마다 별조각 1개를 지급한다. 남은 횟수는 `2/2 → 1/2 → 0/2`로 표시하며 새 wave 시작 시 초기화한다. v30 유물은 보유 인벤토리에 들어가고, 전투당 스왑 횟수, 전투 시작 별조각, 배율, 다시, 저주, 상태 부여, 선택 대상 상태 조건, 받는 피해 배율은 현재 런 상태와 전투 수식에 반영한다.
+
+보상/상점 아이콘은 기존 Addressable `Symbol Sheet Highlight`와 새 유물 Addressable `Relic Sheet 300` 캐시를 사용한다. 심볼 제안은 해당 심볼 아이콘을, 유물은 `RelicCatalog`가 제공하는 v30 아이콘 키를 사용한다.
 
 ## UI image slots
 
@@ -116,7 +118,7 @@ MVP UI는 `Assets/_Project/Prefabs/UI/GameFlow/`의 View 프리팹으로 배치�
 | `GameStart` | `start/hero`, `start/summary-panel` |
 | `RunGame/StartRelicSelect` | 프로토타입에서는 비활성. 첫 진입은 전투 |
 | `RunGame/Battle` | `battle/player-status-panel`, `battle/wave-panel`, `battle/arena`, `battle/slot-machine-panel`, `battle/slot-cell-00`~`battle/slot-cell-14`, `battle/attack-result-panel`, `battle/spin-button`, `battle/spin-result-panel`, `battle/status-panel`, `battle/energy-panel`, `battle/credits-panel`, `battle/presentation-overlay`, `battle/presentation/relic-inventory-origin` |
-| `RunGame/Battle Shop` | `ShopPanel`. 상점 버튼 입력으로 열고 `GameFlowOptionView` 카드 5개와 `RerollButton`을 자동 탐색 |
+| `RunGame/Battle Shop` | `ShopPanel`. 상점 버튼 입력으로 열고 `GameFlowOptionView` 카드 3개, `RerollButton`, wave당 2회 별조각 광고 `Ad Button`을 연결 |
 | `RunReward` | `RewardPanel 1`의 제안 카드 3개. 메인 아이콘은 `GameFlowImageSlot`, 수치 배지는 `GameFlowOptionView`의 `CountImage` Image |
 
 ## Infinite Mode MVP
@@ -160,7 +162,7 @@ BATTLE 1 (Normal)
 
 스핀 결과는 먼저 스왑 대기 상태로 들어가며, 이때는 공격 수치를 계산하거나 표시하지 않고 Addressable `Symbol Sheet Highlight` 스프라이트와 짧은 tilt pulse cue로 매칭 셀만 보여준다. 플레이어가 스왑을 쓰거나 그대로 `ATTACK`을 누르면 그 시점의 보드로 패턴과 `SlotCombatRequest`를 확정한다. 패턴이 없으면 공격을 생성하지 않는다. 패턴 피해는 `심볼 기본 공격력 × 매칭 칸 수 × 족보 배율`로 계산하며, 현재 기본값은 체리 2, 레몬 2, 클로버 3, 종 4, 다이아 5, 7은 7이다.
 
-`40_SlotMachineArea` 하위 `Relic Inventory Origin`은 전투 중 런 인벤토리 열기 버튼으로 사용한다. `RunInventoryViewModel`은 `GameFlowSession.SlotPool`과 `OwnedRelics`를 읽어 심볼 탭에는 6종 심볼의 현재 한 칸 출현 확률과 가중치를, 유물 탭에는 상점에서 구매한 보유 유물을 획득 순서대로 표시한다. View는 버튼/탭/닫기 입력 event와 렌더링만 담당하고, 탭 상태와 데이터 스냅샷은 SceneRoot가 ViewModel을 통해 갱신한다.
+`40_SlotMachineArea` 하위 `Relic Inventory Origin`은 전투 중 런 인벤토리 열기 버튼으로 사용한다. `RunInventoryViewModel`은 `GameFlowSession.SlotPool`과 `OwnedRelics`를 읽어 심볼 탭에는 6종 심볼의 현재 한 칸 출현 확률과 가중치를, 유물 탭에는 상점에서 구매한 보유 유물을 획득 순서대로 표시한다. View는 버튼/탭/닫기 입력 event와 렌더링만 담당하고, 탭 상태와 데이터 스냅샷은 SceneRoot가 ViewModel을 통해 갱신한다. 전투 `Swap HUD`는 `RunBattleSwapHudView`가 현재/최대 횟수를 `0/1`, `1/1` 형식으로 표시하며, 스왑 횟수 증가 효과가 있으면 분모도 함께 증가한다.
 
 ### 슬롯 결과 연출
 

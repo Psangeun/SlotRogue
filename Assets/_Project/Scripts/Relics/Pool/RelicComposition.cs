@@ -73,7 +73,7 @@ namespace SlotRogue.Relics.Pool
         ApplyWeaken,
         GainThorns,
 
-        /// <summary>순수 조합으로 안 되는 특수 규칙. 유물 id로 전용 핸들러가 처리한다(예: R-08/R-14).</summary>
+        /// <summary>순수 조합으로 안 되는 특수 규칙. 유물 id로 전용 핸들러가 처리한다.</summary>
         SpecialRule,
     }
 
@@ -92,6 +92,16 @@ namespace SlotRogue.Relics.Pool
         TurnIndexEquals,
         CoinsAtLeast,
         ActivePatternCountAtLeast,
+        EnemyHasStatus,
+    }
+
+    public enum RelicEnemyStatusCondition
+    {
+        Any = 1,
+        Burn,
+        Infection,
+        Vulnerable,
+        Weaken,
     }
 
     public enum RelicLifetimeKind

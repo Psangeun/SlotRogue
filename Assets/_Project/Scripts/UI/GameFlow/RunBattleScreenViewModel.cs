@@ -131,7 +131,8 @@ namespace SlotRogue.UI.GameFlow
             int startColumn,
             int matchLength,
             IReadOnlyList<int> highlightedCellIndices = null,
-            IReadOnlyList<SlotSymbolType?> highlightedCellSymbols = null)
+            IReadOnlyList<SlotSymbolType?> highlightedCellSymbols = null,
+            IReadOnlyList<RunBattlePatternResultTextState> patternResultTexts = null)
         {
             _slotOutcome = new RunBattleSlotOutcomeState(
                 hasPattern,
@@ -139,19 +140,22 @@ namespace SlotRogue.UI.GameFlow
                 startColumn,
                 matchLength,
                 highlightedCellIndices,
-                highlightedCellSymbols);
+                highlightedCellSymbols,
+                patternResultTexts);
             RequestPublish();
         }
 
         public void SetSwapState(
             bool interactable,
             int swapsRemaining,
-            int selectedCellIndex)
+            int selectedCellIndex,
+            int maxSwaps)
         {
             _swapState = new RunBattleSwapState(
                 interactable,
                 swapsRemaining,
-                selectedCellIndex);
+                selectedCellIndex,
+                maxSwaps);
             RequestPublish();
         }
 
@@ -482,6 +486,7 @@ namespace SlotRogue.UI.GameFlow
             new(false, row: -1, startColumn: -1, matchLength: 0);
 
         private readonly int[] _highlightedCellIndices;
+        private readonly RunBattlePatternResultTextState[] _patternResultTexts;
 
         public RunBattleSlotOutcomeState(
             bool hasPattern,
@@ -489,7 +494,8 @@ namespace SlotRogue.UI.GameFlow
             int startColumn,
             int matchLength,
             IReadOnlyList<int> highlightedCellIndices = null,
-            IReadOnlyList<SlotSymbolType?> highlightedCellSymbols = null)
+            IReadOnlyList<SlotSymbolType?> highlightedCellSymbols = null,
+            IReadOnlyList<RunBattlePatternResultTextState> patternResultTexts = null)
         {
             Row = row;
             StartColumn = startColumn;
@@ -501,6 +507,7 @@ namespace SlotRogue.UI.GameFlow
                 startColumn,
                 matchLength);
             HighlightedCellSymbols = CopyHighlightedCellSymbols(highlightedCellSymbols);
+            _patternResultTexts = Clone(patternResultTexts);
             HasPattern = hasPattern || _highlightedCellIndices.Length > 0;
         }
 
@@ -515,6 +522,8 @@ namespace SlotRogue.UI.GameFlow
         public int[] HighlightedCellIndices => Clone(_highlightedCellIndices);
 
         public SlotSymbolType?[] HighlightedCellSymbols { get; }
+
+        public RunBattlePatternResultTextState[] PatternResultTexts => Clone(_patternResultTexts);
 
         private static int[] CopyHighlightedCellIndices(
             IReadOnlyList<int> source,
@@ -587,26 +596,121 @@ namespace SlotRogue.UI.GameFlow
 
             return result;
         }
+
+        private static RunBattlePatternResultTextState[] Clone(
+            IReadOnlyList<RunBattlePatternResultTextState> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return Array.Empty<RunBattlePatternResultTextState>();
+            }
+
+            var copy = new RunBattlePatternResultTextState[source.Count];
+            for (int index = 0; index < source.Count; index++)
+            {
+                copy[index] = source[index];
+            }
+
+            return copy;
+        }
+    }
+
+    public readonly struct RunBattlePatternResultTextState
+    {
+        private readonly int[] _cellIndices;
+        private readonly StatusEffectViewData[] _statusEffects;
+
+        public RunBattlePatternResultTextState(
+            IReadOnlyList<int> cellIndices,
+            int attackPower,
+            IReadOnlyList<StatusEffectViewData> statusEffects)
+        {
+            _cellIndices = CopyCellIndices(cellIndices);
+            AttackPower = Math.Max(0, attackPower);
+            _statusEffects = Clone(statusEffects);
+        }
+
+        public int AttackPower { get; }
+
+        public int[] CellIndices => Clone(_cellIndices);
+
+        public StatusEffectViewData[] StatusEffects => Clone(_statusEffects);
+
+        public bool HasContent => AttackPower > 0 ||
+            (_statusEffects != null && _statusEffects.Length > 0);
+
+        private static int[] CopyCellIndices(IReadOnlyList<int> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return Array.Empty<int>();
+            }
+
+            var result = new List<int>(source.Count);
+            for (int index = 0; index < source.Count; index++)
+            {
+                int cellIndex = source[index];
+                if (SlotSpinResult.IsValidIndex(cellIndex) && !result.Contains(cellIndex))
+                {
+                    result.Add(cellIndex);
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static int[] Clone(int[] source)
+        {
+            if (source == null || source.Length == 0)
+            {
+                return Array.Empty<int>();
+            }
+
+            var copy = new int[source.Length];
+            Array.Copy(source, copy, source.Length);
+            return copy;
+        }
+
+        private static StatusEffectViewData[] Clone(
+            IReadOnlyList<StatusEffectViewData> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return Array.Empty<StatusEffectViewData>();
+            }
+
+            var copy = new StatusEffectViewData[source.Count];
+            for (int index = 0; index < source.Count; index++)
+            {
+                copy[index] = source[index];
+            }
+
+            return copy;
+        }
     }
 
     public readonly struct RunBattleSwapState
     {
         public static readonly RunBattleSwapState Disabled =
-            new(interactable: false, swapsRemaining: 0, selectedCellIndex: -1);
+            new(interactable: false, swapsRemaining: 0, selectedCellIndex: -1, maxSwaps: 0);
 
         public RunBattleSwapState(
             bool interactable,
             int swapsRemaining,
-            int selectedCellIndex)
+            int selectedCellIndex,
+            int maxSwaps)
         {
             Interactable = interactable;
-            SwapsRemaining = Math.Max(0, swapsRemaining);
+            MaxSwaps = Math.Max(0, maxSwaps);
+            SwapsRemaining = Math.Min(MaxSwaps, Math.Max(0, swapsRemaining));
             SelectedCellIndex = SlotSpinResult.IsValidIndex(selectedCellIndex) ? selectedCellIndex : -1;
         }
 
         public bool Interactable { get; }
 
         public int SwapsRemaining { get; }
+
+        public int MaxSwaps { get; }
 
         public int SelectedCellIndex { get; }
 
@@ -620,7 +724,17 @@ namespace SlotRogue.UI.GameFlow
     public sealed class RunBattleRelicShopState
     {
         public static readonly RunBattleRelicShopState Empty =
-            new(false, Array.Empty<RunBattleRelicShopOfferState>(), 0, 0, false, false, false);
+            new(
+                false,
+                Array.Empty<RunBattleRelicShopOfferState>(),
+                0,
+                0,
+                false,
+                false,
+                false,
+                0,
+                WaveAdRewardModel.MaxClaims,
+                false);
 
         private readonly RunBattleRelicShopOfferState[] _offers;
 
@@ -631,7 +745,10 @@ namespace SlotRogue.UI.GameFlow
             int rerollCost,
             bool canReroll,
             bool canUseShop,
-            bool canOpenShop)
+            bool canOpenShop,
+            int adRewardsRemaining,
+            int adRewardLimit,
+            bool canClaimAdReward)
         {
             Visible = visible;
             _offers = Copy(offers);
@@ -640,6 +757,11 @@ namespace SlotRogue.UI.GameFlow
             CanReroll = canReroll;
             CanUseShop = canUseShop;
             CanOpenShop = canOpenShop;
+            AdRewardLimit = Math.Max(0, adRewardLimit);
+            AdRewardsRemaining = Math.Min(
+                AdRewardLimit,
+                Math.Max(0, adRewardsRemaining));
+            CanClaimAdReward = canClaimAdReward && AdRewardsRemaining > 0;
         }
 
         public bool Visible { get; }
@@ -655,6 +777,12 @@ namespace SlotRogue.UI.GameFlow
         public bool CanUseShop { get; }
 
         public bool CanOpenShop { get; }
+
+        public int AdRewardsRemaining { get; }
+
+        public int AdRewardLimit { get; }
+
+        public bool CanClaimAdReward { get; }
 
         private static RunBattleRelicShopOfferState[] Copy(
             IReadOnlyList<RunBattleRelicShopOfferState> source)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
 using SlotRogue.Data.GameFlow;
@@ -28,7 +29,7 @@ namespace SlotRogue.UI.Tests.GameFlow
         [Test]
         public void All_Has55Relics()
         {
-            // v29 41종 + 엔진 확장(클로버핏 착안, 순수 조합) 14종 = 55.
+            // v30 최종 유물 55종.
             Assert.That(RelicCatalog.All.Count, Is.EqualTo(55));
         }
 
@@ -49,6 +50,22 @@ namespace SlotRogue.UI.Tests.GameFlow
             {
                 Assert.That(relic.IconKey, Is.Not.Null.And.Not.Empty, relic.Id);
             }
+        }
+
+        [Test]
+        public void AllRelics_UseV30SheetIconsInCatalogOrder()
+        {
+            Assert.That(RelicIconKeys.All.Length, Is.EqualTo(56));
+
+            for (int index = 0; index < RelicCatalog.All.Count; index++)
+            {
+                RelicDefinition relic = RelicCatalog.All[index];
+                Assert.That(relic.IconKey, Is.EqualTo(RelicIconKeys.ForIndex(index)), relic.Id);
+            }
+
+            Assert.That(
+                RelicCatalog.All.Select(relic => relic.IconKey).Distinct().Count(),
+                Is.EqualTo(RelicCatalog.All.Count));
         }
 
         [TestCase(RelicRole.Damage, RelicIconKeys.Slot00)]
@@ -85,6 +102,35 @@ namespace SlotRogue.UI.Tests.GameFlow
         }
 
         [Test]
+        public void WaveAdReward_AllowsTwoOneCoinClaims()
+        {
+            var reward = new WaveAdRewardModel();
+
+            Assert.That(reward.RemainingCount, Is.EqualTo(2));
+            Assert.That(reward.TryClaim(out int firstReward), Is.True);
+            Assert.That(firstReward, Is.EqualTo(1));
+            Assert.That(reward.RemainingCount, Is.EqualTo(1));
+            Assert.That(reward.TryClaim(out int secondReward), Is.True);
+            Assert.That(secondReward, Is.EqualTo(1));
+            Assert.That(reward.RemainingCount, Is.Zero);
+            Assert.That(reward.TryClaim(out int exhaustedReward), Is.False);
+            Assert.That(exhaustedReward, Is.Zero);
+        }
+
+        [Test]
+        public void WaveAdReward_Reset_RestoresTwoClaims()
+        {
+            var reward = new WaveAdRewardModel();
+            reward.TryClaim(out _);
+            reward.TryClaim(out _);
+
+            reward.Reset();
+
+            Assert.That(reward.CanClaim, Is.True);
+            Assert.That(reward.RemainingCount, Is.EqualTo(2));
+        }
+
+        [Test]
         public void TmpSpriteIndexes_FollowSlotSymbolOrder()
         {
             Assert.That(
@@ -98,11 +144,40 @@ namespace SlotRogue.UI.Tests.GameFlow
         [Test]
         public void IconSheetAddresses_FollowAddressableNames()
         {
-            Assert.That(RelicIconKeys.SheetAddress, Is.EqualTo("Relic Sheet Highlight"));
+            Assert.That(RelicIconKeys.SheetAddress, Is.EqualTo("Relic Sheet 300"));
             Assert.That(SlotSymbolIconKeys.NormalSheetAddress, Is.EqualTo("Symbol Sheet Normal"));
             Assert.That(SlotSymbolIconKeys.AnimationSheetAddress, Is.EqualTo("Symbol Sheet Animation"));
             Assert.That(SlotSymbolIconKeys.HighlightSheetAddress, Is.EqualTo("Symbol Sheet Highlight"));
             Assert.That(SlotSymbolIconKeys.TmpSpriteAssetAddress, Is.EqualTo("Symbols-Sheet-TMP"));
+        }
+
+        [TestCase("R-40", "빌린 재발동", RelicGrade.Rare, "retrig", 6)]
+        [TestCase("R-39", "폭죽 다발", RelicGrade.Uncommon, "mult", 3)]
+        [TestCase("R-56", "별의 왕관", RelicGrade.Legendary, "mult", 13)]
+        [TestCase("R-57", "잭팟 엔진", RelicGrade.Legendary, "retrig", 13)]
+        [TestCase("R-58", "성냥갑", RelicGrade.Common, "status", 3)]
+        [TestCase("R-59", "기름통", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-60", "독포자 주머니", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-61", "낡은 종추", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-62", "가시 갑옷", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-70", "예열 장치", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-71", "포자 살포기", RelicGrade.Uncommon, "status", 5)]
+        [TestCase("R-72", "구두쇠의 저울", RelicGrade.Curse, "shop", 2)]
+        [TestCase("R-73", "성급한 태엽", RelicGrade.Curse, "swap", 2)]
+        public void RelicCatalog_MatchesV30FinalSource(
+            string id,
+            string expectedName,
+            RelicGrade expectedGrade,
+            string expectedCategory,
+            int expectedPrice)
+        {
+            RelicDefinition relic = RelicCatalog.GetById(id);
+
+            Assert.That(relic, Is.Not.Null);
+            Assert.That(relic.Name, Is.EqualTo(expectedName));
+            Assert.That(relic.Grade, Is.EqualTo(expectedGrade));
+            Assert.That(relic.Category, Is.EqualTo(expectedCategory));
+            Assert.That(relic.Price, Is.EqualTo(expectedPrice));
         }
 
         [Test]
@@ -120,7 +195,7 @@ namespace SlotRogue.UI.Tests.GameFlow
         public void RewardDefinitions_WithDifferentRelicIds_AreNotEqual()
         {
             var first = new RunRewardDefinition(RelicCatalog.GetById("R-01"));
-            var second = new RunRewardDefinition(RelicCatalog.GetById("R-02"));
+            var second = new RunRewardDefinition(RelicCatalog.GetById("R-04"));
 
             Assert.That(first, Is.Not.EqualTo(second));
         }
@@ -218,6 +293,54 @@ namespace SlotRogue.UI.Tests.GameFlow
         }
 
         [Test]
+        public void ApplySymbolWeightProposal_UsesV30FixedPointAmount()
+        {
+            GameFlowSession.StartNewRun();
+            var service = new RunRewardService(new System.Random(1));
+            var reward = new RunRewardDefinition(
+                "TEST-PROB-SEVEN",
+                "prob",
+                RewardRarity.Common,
+                RunProposalEffectKind.SymbolWeight,
+                new[] { SlotSymbolType.Seven },
+                1,
+                "세븐 테스트",
+                "세븐이 더 자주 나온다.");
+
+            service.Apply(reward);
+
+            Assert.That(
+                GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven),
+                Is.EqualTo(0.6f).Within(0.0001f));
+        }
+
+        [Test]
+        public void RollOptions_RemovesOneTimeProposalAfterAcquire()
+        {
+            GameFlowSession.StartNewRun();
+            var reward = new RunRewardDefinition(
+                "P-42",
+                "retrig",
+                RewardRarity.Legendary,
+                RunProposalEffectKind.EngineEffect,
+                System.Array.Empty<SlotSymbolType>(),
+                0,
+                "황금 손",
+                string.Empty);
+            var service = new RunRewardService(new System.Random(1234));
+
+            service.Apply(reward);
+
+            Assert.That(GameFlowSession.HasAcquiredProposal("P-42"), Is.True);
+            Assert.That(
+                RunRewardCatalog.IsOneTimeProposal("P-42"),
+                Is.True);
+            Assert.That(
+                service.RollOptions(34),
+                Has.None.Matches<RunRewardDefinition>(option => option.ProposalId == "P-42"));
+        }
+
+        [Test]
         public void ForTier_Normal_IncludesImplementedSymbolProposalCoverage()
         {
             GameFlowSession.StartNewRun();
@@ -306,17 +429,21 @@ namespace SlotRogue.UI.Tests.GameFlow
         {
             GameFlowSession.StartNewRun();
             var viewModel = new RunInventoryViewModel();
-            GameFlowSession.ApplySymbolReward(SlotSymbolType.Lemon, 2);
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Lemon },
+                countRewardClaim: false);
 
             viewModel.OpenDescription();
 
             AssertInventorySymbolWeight(
                 viewModel.State.CurrentValue,
                 SlotSymbolType.Lemon,
-                SlotSymbolPool.DefaultWeightFor(SlotSymbolType.Lemon) + 2);
+                SlotSymbolPool.DefaultWeightFor(SlotSymbolType.Lemon) +
+                    SlotSymbolPool.ProposalWeightIncrease);
             Assert.That(
                 viewModel.State.CurrentValue.Summary,
-                Does.Contain($"확률 합계 {DefaultInitialSymbolWeightTotal() + 2}%"));
+                Does.Contain(
+                    $"가중치 합계 {FormatWeight(DefaultInitialSymbolWeightTotal() + SlotSymbolPool.ProposalWeightIncrease)}"));
         }
 
         [Test]
@@ -398,13 +525,13 @@ namespace SlotRogue.UI.Tests.GameFlow
         private static void AssertInventorySymbolWeight(
             RunInventoryViewState state,
             SlotSymbolType symbol,
-            int expectedWeight)
+            float expectedWeight)
         {
             foreach (RunInventorySymbolViewState item in state.Symbols)
             {
                 if (item.Symbol == symbol)
                 {
-                    Assert.That(item.Weight, Is.EqualTo(expectedWeight));
+                    Assert.That(item.Weight, Is.EqualTo(expectedWeight).Within(0.0001f));
                     return;
                 }
             }
@@ -412,15 +539,20 @@ namespace SlotRogue.UI.Tests.GameFlow
             Assert.Fail($"심볼이 인벤토리에 없습니다: {symbol}");
         }
 
-        private static int DefaultInitialSymbolWeightTotal()
+        private static float DefaultInitialSymbolWeightTotal()
         {
-            int total = 0;
+            float total = 0f;
             foreach (SlotSymbolType symbol in SlotSymbolPool.Symbols)
             {
                 total += SlotSymbolPool.DefaultWeightFor(symbol);
             }
 
             return total;
+        }
+
+        private static string FormatWeight(float weight)
+        {
+            return weight.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         private static void ConfigureDefaultInitialSymbolWeights()

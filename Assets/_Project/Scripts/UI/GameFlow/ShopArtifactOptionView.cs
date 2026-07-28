@@ -95,14 +95,13 @@ public sealed class ShopArtifactOptionView : MonoBehaviour
                 RunCurrencyText.ApplySpriteAsset(_priceTmpText, currencySprite);
                 _priceTmpText.text = offer.Purchased
                     ? "구매완료"
-                    : RunCurrencyText.FormatAmount(offer.Cost, currencySprite);
+                    : RunCurrencyText.FormatPlainAmount(offer.Cost);
             }
 
             if (_purchaseButton != null)
             {
                 _purchaseButton.gameObject.SetActive(true);
-                _purchaseButton.interactable =
-                    canBuy && !offer.Purchased && offer.CanPurchase;
+                _purchaseButton.interactable = !offer.Purchased;
             }
         }
 

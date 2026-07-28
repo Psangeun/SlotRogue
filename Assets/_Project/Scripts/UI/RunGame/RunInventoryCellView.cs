@@ -13,8 +13,6 @@ namespace SlotRogue.UI.RunGame
         [SerializeField] private TMP_Text _nameText;
         [SerializeField] private TMP_Text _descriptionText;
         [FormerlySerializedAs("_text")]
-        [SerializeField] private Text _legacyText;
-        [SerializeField] private GameObject _highlight;
 
         private bool _missingReferenceErrorLogged;
 
@@ -26,15 +24,10 @@ namespace SlotRogue.UI.RunGame
 
         internal TMP_Text DescriptionText => _descriptionText;
 
-        internal Text LegacyText => _legacyText;
-
-        internal GameObject Highlight => _highlight;
-
         internal void ValidateRequiredReferences()
         {
             bool hasText = _nameText != null ||
-                _descriptionText != null ||
-                _legacyText != null;
+                _descriptionText != null;
 
             if (_missingReferenceErrorLogged ||
                 (_icon != null && hasText))
@@ -54,8 +47,7 @@ namespace SlotRogue.UI.RunGame
             var missing = new System.Collections.Generic.List<string>();
             if (_icon == null) missing.Add("Icon");
             if (_nameText == null &&
-                _descriptionText == null &&
-                _legacyText == null)
+                _descriptionText == null)
             {
                 missing.Add("Name Text or Description Text");
             }

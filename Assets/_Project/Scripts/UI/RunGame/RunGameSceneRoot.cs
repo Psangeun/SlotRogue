@@ -49,31 +49,37 @@ namespace SlotRogue.UI.RunGame
         [Header("Tutorial")]
         [SerializeField] private RunBattleTutorialSequenceDefinition _tutorialSequenceDefinition;
 
-        [Header("Initial Symbol Probabilities (%)")]
+        [Header("Initial Symbol Weights")]
         [FormerlySerializedAs("_initialCherryCount")]
         [FormerlySerializedAs("_initialCherryProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialCherryProbabilityPercent =
-            SlotSymbolPool.DefaultCherryProbabilityPercent;
+        [FormerlySerializedAs("_initialCherryProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialCherryWeight =
+            SlotSymbolPool.DefaultCherryWeight;
         [FormerlySerializedAs("_initialLemonCount")]
         [FormerlySerializedAs("_initialLemonProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialLemonProbabilityPercent =
-            SlotSymbolPool.DefaultLemonProbabilityPercent;
+        [FormerlySerializedAs("_initialLemonProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialLemonWeight =
+            SlotSymbolPool.DefaultLemonWeight;
         [FormerlySerializedAs("_initialCloverCount")]
         [FormerlySerializedAs("_initialCloverProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialCloverProbabilityPercent =
-            SlotSymbolPool.DefaultCloverProbabilityPercent;
+        [FormerlySerializedAs("_initialCloverProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialCloverWeight =
+            SlotSymbolPool.DefaultCloverWeight;
         [FormerlySerializedAs("_initialBellCount")]
         [FormerlySerializedAs("_initialBellProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialBellProbabilityPercent =
-            SlotSymbolPool.DefaultBellProbabilityPercent;
+        [FormerlySerializedAs("_initialBellProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialBellWeight =
+            SlotSymbolPool.DefaultBellWeight;
         [FormerlySerializedAs("_initialDiamondCount")]
         [FormerlySerializedAs("_initialDiamondProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialDiamondProbabilityPercent =
-            SlotSymbolPool.DefaultDiamondProbabilityPercent;
+        [FormerlySerializedAs("_initialDiamondProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialDiamondWeight =
+            SlotSymbolPool.DefaultDiamondWeight;
         [FormerlySerializedAs("_initialSevenCount")]
         [FormerlySerializedAs("_initialSevenProbabilityWeight")]
-        [SerializeField, Range(0, 100)] private int _initialSevenProbabilityPercent =
-            SlotSymbolPool.DefaultSevenProbabilityPercent;
+        [FormerlySerializedAs("_initialSevenProbabilityPercent")]
+        [SerializeField, Min(0f)] private float _initialSevenWeight =
+            SlotSymbolPool.DefaultSevenWeight;
 
         [Header("Symbol Base Damage")]
         [SerializeField, Min(0)] private int _cherryBaseDamage =
@@ -177,12 +183,12 @@ namespace SlotRogue.UI.RunGame
         private void ConfigureInitialSymbolProbabilities()
         {
             GameFlowSession.ConfigureInitialSymbolWeights(
-                _initialCherryProbabilityPercent,
-                _initialLemonProbabilityPercent,
-                _initialCloverProbabilityPercent,
-                _initialBellProbabilityPercent,
-                _initialDiamondProbabilityPercent,
-                _initialSevenProbabilityPercent);
+                _initialCherryWeight,
+                _initialLemonWeight,
+                _initialCloverWeight,
+                _initialBellWeight,
+                _initialDiamondWeight,
+                _initialSevenWeight);
         }
 
         private void ConfigureSymbolBaseDamage()

@@ -11,7 +11,7 @@ namespace SlotRogue.UI.GameFlow
     /// </summary>
     internal sealed class RelicShopModel
     {
-        public const int OfferCount = 5;
+        public const int OfferCount = 3;
         public const int RerollCost = 1;
 
         private readonly RelicDefinition[] _offers = new RelicDefinition[OfferCount];
@@ -123,7 +123,7 @@ namespace SlotRogue.UI.GameFlow
                 return false;
             }
 
-            // v29 유물 효과는 P1 실행 엔진에서 처리한다 — 구매 시점엔 인벤토리에 넣기만 한다.
+            // v30 유물 효과는 실행 엔진에서 처리한다 — 구매 시점엔 인벤토리에 넣기만 한다.
             if (relic.OccupiesSlot)
             {
                 return GameFlowSession.TryAddRelic(relic);
@@ -174,15 +174,49 @@ namespace SlotRogue.UI.GameFlow
                 : relic.Grade switch
             {
                 RelicGrade.Curse => 3,
-                RelicGrade.Common => 4,
-                RelicGrade.Uncommon => 6,
+                RelicGrade.Common => 3,
+                RelicGrade.Uncommon => 5,
                 RelicGrade.Rare => 8,
-                RelicGrade.Legendary => 10,
-                _ => 4,
+                RelicGrade.Legendary => 13,
+                _ => 3,
             };
 
             cost -= GameFlowSession.ShopDiscount;
             return Math.Max(1, cost);
+        }
+    }
+
+    /// <summary>
+    /// 한 전투에서 광고로 받을 수 있는 별조각 횟수와 지급량을 관리한다.
+    /// 광고 SDK 상태와 무관한 순수 규칙이므로 전투 시작 시 Reset하고 reward callback에서만 소비한다.
+    /// </summary>
+    internal sealed class WaveAdRewardModel
+    {
+        internal const int MaxClaims = 2;
+        internal const int RewardPerClaim = 1;
+
+        internal int ClaimedCount { get; private set; }
+
+        internal int RemainingCount => Math.Max(0, MaxClaims - ClaimedCount);
+
+        internal bool CanClaim => RemainingCount > 0;
+
+        internal void Reset()
+        {
+            ClaimedCount = 0;
+        }
+
+        internal bool TryClaim(out int reward)
+        {
+            if (!CanClaim)
+            {
+                reward = 0;
+                return false;
+            }
+
+            ClaimedCount++;
+            reward = RewardPerClaim;
+            return true;
         }
     }
 }

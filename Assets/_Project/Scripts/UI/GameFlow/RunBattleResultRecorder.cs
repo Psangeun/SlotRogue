@@ -7,7 +7,9 @@ namespace SlotRogue.UI.GameFlow
     {
         private LeaderboardRunSnapshot? _pendingDefeatSnapshot;
 
-        internal void Record(BattleFlowResult result)
+        internal void Record(
+            BattleFlowResult result,
+            RunEncounterRoster encounterRoster = null)
         {
             GameFlowSession.RecordRelicContributions(result.RelicContributions);
             GameFlowSession.RecordSlotSymbolContributions(result.SlotSymbolContributions);
@@ -15,6 +17,7 @@ namespace SlotRogue.UI.GameFlow
             if (result.EndReason == BattleEndReason.Victory)
             {
                 _pendingDefeatSnapshot = null;
+                RecordDefeatedMonsterProfiles(encounterRoster);
                 if (GameFlowSession.IsInfiniteMode)
                 {
                     GameFlowSession.CompleteInfiniteVictory(result.RemainingPlayerHp);
@@ -71,6 +74,24 @@ namespace SlotRogue.UI.GameFlow
             GameFlowSession.CompleteBattleDefeat();
             SlotRogueLeaderboardService.QueueRunSubmission(snapshot);
             _pendingDefeatSnapshot = null;
+        }
+
+        private static void RecordDefeatedMonsterProfiles(
+            RunEncounterRoster encounterRoster)
+        {
+            if (encounterRoster?.Enemies == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < encounterRoster.Enemies.Count; index++)
+            {
+                EnemyEncounterUnit enemy = encounterRoster.Enemies[index];
+                if (enemy?.Definition != null)
+                {
+                    MonsterProfileCollectionStore.RecordDefeated(enemy.Definition);
+                }
+            }
         }
     }
 }

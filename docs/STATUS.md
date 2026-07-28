@@ -1,6 +1,6 @@
 ﻿# 프로젝트 상태
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-28_
 
 ---
 
@@ -10,21 +10,21 @@ _Last updated: 2026-07-25_
 
 **RunBattle 적 슬롯 프리팹** — [`feature-enemy-formation-slot`](./exec-plans/completed/feature-enemy-formation-slot.md) **완료** (2026-06-04): `EnemyFormationSlot` 프리팹, 슬롯 DamageAnchor + 플로팅 좌표 변환. `MonsterDefinition.portrait` 공급은 tier 기반 생성기로 정리하면서 후속 기획 확정 전까지 비활성이다.
 
-**게임 플로우 루프** — [`feature-game-flow-loop`](./exec-plans/active/feature-game-flow-loop.md): 게임 시작 → 시작 유물 → 전투 → 보상 → 다음 전투로 이어지는 무한모드 루프. 전투 진입은 `WaveSchedule`로 평가한 `EncounterTier`와 ThemeGroup 기반 `EncounterSelector` 결과를 `RunEncounterRosterBuilder.Build(selection, context, balance)`에 전달하며, 전투 코드는 수정하지 않고 기존 API로 연결한다. 전투 중 `Relic Inventory Origin`은 심볼별 한 칸 출현 확률 가중치와 보유 유물 탭 인벤토리를 연다.
+**게임 플로우 루프** — [`feature-game-flow-loop`](./exec-plans/active/feature-game-flow-loop.md): 게임 시작 → 시작 유물 → 전투 → 보상 → 다음 전투로 이어지는 무한모드 루프. 전투 진입은 `WaveSchedule`로 평가한 `EncounterTier`와 ThemeGroup 기반 `EncounterSelector` 결과를 `RunEncounterRosterBuilder.Build(selection, context, balance)`에 전달하며, 전투 코드는 수정하지 않고 기존 API로 연결한다. 전투 중 `Relic Inventory Origin`은 심볼별 한 칸 출현 float 가중치와 보유 유물 탭 인벤토리를 연다.
 
-**심볼 스왑 프로토타입** — [`feature-reel-lock-prototype`](./exec-plans/active/feature-reel-lock-prototype.md): `codex/reel-lock-prototype` 브랜치에서 전투 시스템 본체를 유지한 채 플레이어 턴 개입감을 검증한다. 릴 잠금 실험은 폐기하고, 스핀 후 인접한 두 심볼을 턴당 1회 바꾸는 스왑 단계로 전환했다. 스왑 대기 중에는 매칭 preview와 Addressable 하이라이트 심볼/tilt pulse cue만 표시하고, 패턴/전투 요청 계산은 `ATTACK` 입력 뒤 확정한다. 일반/튜토리얼 런은 시작 유물 없이 첫 전투로 들어가며, 튜토리얼 승리 후에는 일반 런으로 전환해 `RewardPanel 1` 제안 화면으로 들어간다. 스핀 별조각은 공격 확정 시 지급하고, SWAP을 사용하면 해당 턴에는 지급하지 않는다. 전투 후 `RewardPanel 1`은 v33 제안 42종 중 3택을 띄우고, `ShopPanel`은 상점 버튼으로 열어 `GameFlowOptionView` 유물 카드 5개에 v33 유물 44종을 별조각 가격으로 표시해 구매/리롤한다. 보유 유물은 기본 5칸, 제안 증가 후 최대 7칸까지만 허용한다. 현재 심볼 가중치·Base·별조각·스왑 횟수·전투 시작 별조각 효과는 런 상태에 직접 연결했고, 배율/다시/저주 수식은 후속 전투 계산 연결 범위로 남긴다.
+**심볼 스왑 프로토타입** — [`feature-reel-lock-prototype`](./exec-plans/active/feature-reel-lock-prototype.md): `codex/reel-lock-prototype` 브랜치에서 전투 시스템 본체를 유지한 채 플레이어 턴 개입감을 검증한다. 릴 잠금 실험은 폐기하고, 스핀 후 인접한 두 심볼을 턴당 1회 바꾸는 스왑 단계로 전환했다. 스왑 대기 중에는 매칭 preview와 Addressable 하이라이트 심볼/tilt pulse cue만 표시하고, 패턴/전투 요청 계산은 `ATTACK` 입력 뒤 확정한다. 일반/튜토리얼 런은 시작 유물 없이 첫 전투로 들어가며, 튜토리얼 승리 후에는 일반 런으로 전환해 `RewardPanel 1` 제안 화면으로 들어간다. 스핀 별조각은 공격 확정 시 지급하고, SWAP을 사용하면 해당 턴에는 지급하지 않는다. 전투 후 `RewardPanel 1`은 v30 제안 34종 중 3택을 띄우고, `ShopPanel`은 상점 버튼으로 열어 `GameFlowOptionView` 유물 카드 3개에 v30 최종 HTML 유물 55종을 개별 별조각 가격으로 표시해 구매/리롤한다. 상점 광고 버튼은 wave당 2회, 1회당 별조각 1개를 지급하고 남은 횟수를 `2/2 → 1/2 → 0/2`로 표시한다. 보유 유물은 기본 5칸, 제안 증가 후 최대 7칸까지만 허용한다. 현재 심볼 가중치는 기본 float 값(체리/레몬 1.3, 종/클로버 1.0, 다이아 0.8, 7 0.5)에서 v30 제안값을 0.1 단위로 더한다. 체리/레몬은 `+0.3f`, 종/클로버/다이아는 `+0.2f`, 세븐은 `+0.1f`이며, 절반 제안은 `×0.5f`를 적용한다. 1회성 제안 `P-35`/`P-37`/`P-42`/`P-47`/`P-48`은 획득 후 보상풀에서 제외한다. Base·별조각·스왑 횟수·전투 시작 별조각·배율·재발동·저주·상태 부여·선택 대상 상태 조건·받는 피해 배율은 런/전투 계산 경로에 연결했다.
 
 **규칙 기반 Encounter 선택** — [`feature-rule-based-encounter-selection`](./exec-plans/completed/feature-rule-based-encounter-selection.md) **완료** (2026-06-22): 기존 `MonsterDefinition` 기반 전투 생성 흐름 앞에 EncounterTable/Selector를 추가해 ThemeGroup·Tier·Weight·runSeed 기준으로 몬스터 편성을 결정한다. 선택 데이터, formation layout, 결정적 `EncounterSelector`, 인접 theme section 반복 방지, `EncounterSelection` 기반 roster builder, `BattleSceneCompositionRoot` 연결, `WaveScheduleDefinition` 기반 EncounterTier/ThemeSectionIndex 평가, HP 전용 `EncounterScaling`을 본편 생성 경로에 반영했고 Unity compile과 관련 EditMode 테스트 확인을 완료했다.
 
 **최초 튜토리얼** — [`feature-first-run-tutorial`](./exec-plans/completed/feature-first-run-tutorial.md), [`feature-tutorial-battle-flow`](./exec-plans/completed/feature-tutorial-battle-flow.md) **완료** (2026-06-19): [ADR-0017](./adr/0017-first-run-tutorial-run-game-mode.md)에 따라 별도 Scene 복제 없이 `RunGame` 튜토리얼 모드로 최초 1회 전투를 시작한다. 현재 튜토리얼은 5턴 내 몬스터 처치, 슬롯 결과 기반 공격력, 스핀 별조각 지급, SWAP 시 별조각 미지급, 별조각 유물 구매, 몬스터 처치 시 유물 상점 초기화를 안내한다. 완료 후에는 일반 런으로 전환해 `RewardPanel 1` 제안 화면으로 들어가며, 로비의 튜토리얼 초기화 버튼은 `FirstRunTutorialState` 플래그를 지워 다음 시작을 튜토리얼로 되돌린다.
 
-**유물 v23 런타임 단일화** — [ADR-0005](./adr/0005-relic-v23-runtime-model.md): v23 80종을 `RelicCatalog`에 등록하고 `OwnedRelics` 전체를 `RelicEffectRunner`로 연결했다. 시작 유물 후보 S-01~S-06은 카탈로그에 남아 있지만, 심볼 스왑 프로토타입 브랜치의 일반/튜토리얼 런은 시작 유물을 지급하지 않는다. 일반 심볼·태그 조건의 화상·감염·취약·약화·가시 유물은 기존 상태 효과 요청 파이프라인으로 활성화했으며, 별도 실행 시점이나 발동 제한이 필요한 연계 유물은 보상풀에서 제외한다. 몬스터 행동도 같은 `StatusEffectSpec.FromAmount` 계약을 사용하되, 속성 자체를 단일 action effect로 취급해 1 action = 1 effect 구조를 유지한다.
+**유물 v30 런타임 카탈로그** — [ADR-0005](./adr/0005-relic-v23-runtime-model.md)에서 출발한 단일 런타임 모델을 유지하되, 현재 데이터 출처는 v30 최종 HTML 기반 `RelicSpecCatalog` 55종이다. `RelicCatalog.Starters`는 비어 있고 `RewardPool`은 상점 유물 55종 전체를 제공한다. `RelicSpecRunner`가 정수 피해·회복·배율·재발동·스왑 횟수·상점 가격 보정·전투 시작/처치 별조각·저주·상태 부여·선택 대상 상태 조건·받는 피해 배율을 런/전투 계산 경로에 연결한다.
 
 **런타임 자산 로드 경계** — [ADR-0006](./adr/0006-runtime-asset-loading-boundary.md): 슬롯 패턴과 전투 UI의 `Resources.Load*` fallback을 제거하고 Prefab 직렬화 참조와 Composition Root 주입으로 전환했다. AssetBundle 그룹·배포 전략은 후속 결정으로 남긴다.
 
 **Addressables 로컬 기준선** — [ADR-0007](./adr/0007-addressables-local-runtime-assets.md): Addressables 2.9.1과 `Default Local Group`을 적용하고 `SlotPatternCatalog`을 `slot/catalog/patterns` 키로 비동기 로드한다. Editor는 Fast Mode, Player 빌드는 Addressables 콘텐츠 동반 생성을 사용한다. 원격 배포 전략은 후속 결정으로 남긴다.
 
-**유물 아이콘 키** — [ADR-0009](./adr/0009-relic-icon-addressable-keys.md): `RelicDefinition.IconKey`를 시작 선택·보상 ViewState까지 전달하고 `RunGameSceneRoot`가 Addressable Sprite를 캐시·해제한다. 현재 16종 시트는 `relic/icons/base`로 등록하며 유물별 `iconKey:` 덮어쓰기로 점진 확장한다.
+**유물 아이콘 키** — [ADR-0009](./adr/0009-relic-icon-addressable-keys.md): `RelicDefinition.IconKey`를 상점·보상·인벤토리 ViewState까지 전달하고 조립 계층이 Addressable Sprite를 캐시·해제한다. 현재 v30 시트 `Assets/_Project/Art/Relics/icon-Sheet_300.png`는 `Relic Sheet 300` 주소로 등록하며, 56개 sub-sprite 중 앞 55개를 v30 유물 카탈로그 순서대로 사용한다.
 
 **UGS 런 리더보드** — [`feature-leaderboard`](./exec-plans/completed/feature-leaderboard.md) **완료** (2026-06-12): `Slot_Rogue_Leaderboard`에 클리어 wave 최고기록과 도달 wave·유물 ID metadata를 제출하고 GameStart에서 Top 10과 Player Name을 조회한다. 실제 네트워크 검증 전 Cloud Project 연결이 필요하다.
 

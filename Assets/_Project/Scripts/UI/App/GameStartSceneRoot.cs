@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using Cysharp.Threading.Tasks;
 using R3;
 using SlotRogue.UI.GameFlow;
@@ -18,11 +20,20 @@ namespace SlotRogue.UI.App
     [DefaultExecutionOrder(-10000)]
     public sealed class GameStartSceneRoot : MonoBehaviour
     {
+        private const float LobbyResourceRefreshIntervalSeconds = 1f;
+
         private static bool _openLeaderboardOnNextLoad;
 
         [SerializeField] private GameStartView _view;
         [SerializeField] private LeaderboardView _leaderboardView;
         [SerializeField] private Button _rankingButton;
+        [Header("Lobby HUD")]
+        [SerializeField] private TMP_Text _profileNameText;
+        [SerializeField] private TMP_Text _energyText;
+        [SerializeField] private TMP_Text _energyTimerText;
+        [SerializeField] private TMP_Text _currencyText;
+        [SerializeField] private TMP_Text _lobbyStatusText;
+        [SerializeField] private LobbyProfileSelectionView _profileSelectionView;
         [Header("Settings")]
         [SerializeField] private GameObject _settingPanel;
         [SerializeField] private Button _settingOpenButton;
@@ -45,7 +56,12 @@ namespace SlotRogue.UI.App
 
         private GameStartViewModel _viewModel;
         private LeaderboardViewModel _leaderboardViewModel;
+        private LobbyProfileSelectionViewModel _profileSelectionViewModel;
         private readonly LobbySpaceBackground _lobbyBackground = new();
+        private string _currentLobbyNickname = string.Empty;
+        private string _lobbyStatusMessage = string.Empty;
+        private float _nextLobbyResourceRefreshTime;
+        private bool _startGameInProgress;
 
         public static void RequestOpenLeaderboardOnNextLoad()
         {
@@ -58,6 +74,7 @@ namespace SlotRogue.UI.App
 
             _viewModel = new GameStartViewModel();
             _leaderboardViewModel = new LeaderboardViewModel();
+            _profileSelectionViewModel = new LobbyProfileSelectionViewModel();
 
             if (_view == null)
             {
@@ -68,9 +85,13 @@ namespace SlotRogue.UI.App
             EnsureLeaderboardView();
             EnsureNicknameSetupView();
             _lobbyBackground.Bind(_lobbyPlanetLayer, _lobbyPlanets, _planetPresets);
+            ValidateLobbyHudReferences();
+            EnsureProfileSelectionView();
+            RenderLobbyHud();
             ConfigureSettingsPanel();
             ConfigureRemoveAdsButton();
             AdsRemoveState.Changed += HandleAdsRemoveChanged;
+            LobbyPlayerResourceStore.Changed += HandleLobbyResourcesChanged;
 
             if (_view != null)
             {
@@ -102,6 +123,8 @@ namespace SlotRogue.UI.App
                 _nicknameSetupView.NicknameSubmitted += HandleNicknameSubmitted;
                 _leaderboardViewModel.State.Subscribe(_nicknameSetupView.Render).AddTo(this);
             }
+
+            _leaderboardViewModel.State.Subscribe(HandleLeaderboardStateChanged).AddTo(this);
         }
 
         private void Start()
@@ -114,11 +137,18 @@ namespace SlotRogue.UI.App
             }
 
             _leaderboardViewModel?.EvaluateProfileRequirement();
+            RenderLobbyHud();
         }
 
         private void Update()
         {
             _lobbyBackground.Tick(Time.unscaledDeltaTime);
+            if (Time.unscaledTime >= _nextLobbyResourceRefreshTime)
+            {
+                _nextLobbyResourceRefreshTime =
+                    Time.unscaledTime + LobbyResourceRefreshIntervalSeconds;
+                RenderLobbyHud();
+            }
         }
 
         // 인스펙터에서 프리셋 배열이 비었을 때 우클릭 메뉴로 기본값을 채운다.
@@ -131,6 +161,7 @@ namespace SlotRogue.UI.App
         private void OnDestroy()
         {
             AdsRemoveState.Changed -= HandleAdsRemoveChanged;
+            LobbyPlayerResourceStore.Changed -= HandleLobbyResourcesChanged;
 
             if (_view != null)
             {
@@ -143,6 +174,8 @@ namespace SlotRogue.UI.App
                 _viewModel.StartGameRequested -= StartGame;
                 _viewModel.QuitGameRequested -= QuitGame;
             }
+
+            _profileSelectionViewModel?.Dispose();
 
             // Leaderboard close/refresh와 상태 구독은 View.Bind(.AddTo)가 소유해 자동 해제된다.
             // SceneRoot가 직접 연결한 랭킹 버튼만 여기서 해제한다(ADR-0020).
@@ -208,6 +241,26 @@ namespace SlotRogue.UI.App
             _leaderboardViewModel.SaveProfileAsync(nickname).Forget();
         }
 
+        private void HandleLeaderboardStateChanged(LeaderboardViewState state)
+        {
+            if (!string.IsNullOrWhiteSpace(state?.PlayerName))
+            {
+                _currentLobbyNickname = state.PlayerName.Trim();
+            }
+            else
+            {
+                RefreshLobbyNicknameFromStore();
+            }
+
+            RenderLobbyHud();
+        }
+
+        private void HandleLobbyResourcesChanged(
+            LobbyPlayerResourceSnapshot snapshot)
+        {
+            RenderLobbyHud(snapshot);
+        }
+
         private void EnsureLeaderboardView()
         {
             if (_leaderboardView != null)
@@ -230,6 +283,39 @@ namespace SlotRogue.UI.App
 
             Debug.LogError(
                 "[GameStartSceneRoot] PlayerNicknameSetupView must be wired in the inspector.");
+        }
+
+        private void EnsureProfileSelectionView()
+        {
+            if (_profileSelectionView != null)
+            {
+                _profileSelectionView.Bind(_profileSelectionViewModel);
+                return;
+            }
+
+            Debug.LogError(
+                "[GameStartSceneRoot] LobbyProfileSelectionView must be wired in the inspector.");
+        }
+
+        private void ValidateLobbyHudReferences()
+        {
+            if (_profileNameText != null &&
+                _energyText != null &&
+                _energyTimerText != null &&
+                _currencyText != null)
+            {
+                return;
+            }
+
+            var builder = new System.Text.StringBuilder();
+            AppendMissing(builder, _profileNameText != null, "Profile Name Text");
+            AppendMissing(builder, _energyText != null, "Energy Text");
+            AppendMissing(builder, _energyTimerText != null, "Energy Timer Text");
+            AppendMissing(builder, _currencyText != null, "Currency Text");
+            Debug.LogError(
+                "[GameStartSceneRoot] Lobby HUD references must be wired in the inspector. " +
+                $"Missing: {builder}",
+                this);
         }
 
         private void ConfigureSettingsPanel()
@@ -318,12 +404,36 @@ namespace SlotRogue.UI.App
 
         private void StartGame()
         {
+            StartGameAsync().Forget();
+        }
+
+        private async UniTaskVoid StartGameAsync()
+        {
             if (_leaderboardViewModel == null ||
                 !_leaderboardViewModel.HasCompletedProfile)
             {
                 _leaderboardViewModel?.RequireProfile();
                 return;
             }
+
+            if (!LobbyPlayerResourceStore.TrySpendStartEnergy(
+                    out LobbyPlayerResourceSnapshot resources))
+            {
+                _lobbyStatusMessage =
+                    $"에너지가 부족합니다. 게임 시작에는 {resources.StartEnergyCost}개가 필요합니다.";
+                RenderLobbyHud(resources);
+                return;
+            }
+
+            if (_startGameInProgress)
+            {
+                return;
+            }
+
+            _startGameInProgress = true;
+            _lobbyStatusMessage = "게임 준비 중...";
+            RenderLobbyHud(resources);
+            await UniTask.Yield(PlayerLoopTiming.Update);
 
             if (!FirstRunTutorialState.IsCompleted)
             {
@@ -335,7 +445,108 @@ namespace SlotRogue.UI.App
                 GameFlowSession.StartNewRun();
             }
 
-            GameSceneLoader.LoadRunGame();
+            try
+            {
+                await GameSceneLoader.LoadRunGameAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[GameStartSceneRoot] RunGame scene load failed: {ex.Message}");
+                _startGameInProgress = false;
+                _lobbyStatusMessage = "게임 시작에 실패했습니다.";
+                RenderLobbyHud();
+            }
+        }
+
+        private void RenderLobbyHud()
+        {
+            RenderLobbyHud(LobbyPlayerResourceStore.Load());
+        }
+
+        private void RenderLobbyHud(LobbyPlayerResourceSnapshot resources)
+        {
+            RefreshLobbyNicknameFromStore();
+
+            if (_profileNameText != null)
+            {
+                _profileNameText.text = _currentLobbyNickname;
+            }
+
+            if (_energyText != null)
+            {
+                _energyText.text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}/{1}",
+                    resources.Energy,
+                    resources.MaxEnergy);
+            }
+
+            if (_energyTimerText != null)
+            {
+                bool isRecovering = !resources.IsEnergyFull;
+                _energyTimerText.gameObject.SetActive(isRecovering);
+                _energyTimerText.text = isRecovering
+                    ? FormatEnergyTimerLabel(resources)
+                    : string.Empty;
+            }
+
+            if (_currencyText != null)
+            {
+                _currencyText.text =
+                    resources.Currency.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (_lobbyStatusText != null)
+            {
+                _lobbyStatusText.text = _lobbyStatusMessage;
+            }
+        }
+
+        internal static string FormatEnergyTimerLabel(
+            LobbyPlayerResourceSnapshot resources)
+        {
+            if (resources.IsEnergyFull)
+            {
+                return string.Empty;
+            }
+
+            int remainingSeconds = Math.Max(
+                0,
+                (int)Math.Ceiling(resources.TimeUntilNextEnergy.TotalSeconds));
+            int minutes = remainingSeconds / 60;
+            int seconds = remainingSeconds % 60;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0:00}:{1:00}",
+                minutes,
+                seconds);
+        }
+
+        private void RefreshLobbyNicknameFromStore()
+        {
+            if (LeaderboardPlayerProfileStore.TryLoad(
+                    out LeaderboardPlayerProfile profile))
+            {
+                _currentLobbyNickname = profile.Nickname;
+            }
+        }
+
+        private static void AppendMissing(
+            System.Text.StringBuilder builder,
+            bool hasReference,
+            string label)
+        {
+            if (hasReference)
+            {
+                return;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append(label);
         }
 
         private static void QuitGame()

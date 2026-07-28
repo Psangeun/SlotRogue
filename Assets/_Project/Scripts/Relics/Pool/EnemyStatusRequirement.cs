@@ -1,7 +1,7 @@
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// Conditional 트리거 유물이 요구하는 적 상태이상(v23).
+    /// Conditional 트리거 유물이 요구하는 적 상태이상.
     /// </summary>
     public enum EnemyStatusRequirement
     {

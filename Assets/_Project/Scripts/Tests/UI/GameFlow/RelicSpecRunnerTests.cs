@@ -6,7 +6,7 @@ using SlotRogue.Slot.Data;
 namespace SlotRogue.UI.Tests.Relics
 {
     /// <summary>
-    /// v29 유물 실행 엔진(<see cref="RelicSpecRunner"/>)의 OnDamageResolve 슬라이스 검증.
+    /// v30 유물 실행 엔진(<see cref="RelicSpecRunner"/>)의 OnDamageResolve 슬라이스 검증.
     /// 실제 카탈로그(<see cref="RelicSpecCatalog"/>) 데이터로 조건·다중 발동·배율 누적을 확인한다.
     /// </summary>
     public sealed class RelicSpecRunnerTests
@@ -72,14 +72,14 @@ namespace SlotRogue.UI.Tests.Relics
         [Test]
         public void ComboMultAdd_AccumulatesPerMatchingPattern()
         {
-            // R-09 체리 증폭기 = 체리 3개↑ 족보마다 Mult +0.3. 두 줄이면 +0.6.
+            // R-09 체리 증폭기 = 체리 3개↑ 족보마다 Mult +0.5. 두 줄이면 +1.0.
             RelicSpecResolveResult twoLines = RelicSpecRunner.ResolveDamageTurn(
                 Own("R-09"), Ctx(),
                 Pats(Pat(SlotSymbolType.Cherry, 3), Pat(SlotSymbolType.Cherry, 4)));
             RelicSpecResolveResult noCherry = RelicSpecRunner.ResolveDamageTurn(
                 Own("R-09"), Ctx(), Pats(Pat(SlotSymbolType.Lemon, 3)));
 
-            Assert.That(twoLines.ComboMultAdd, Is.EqualTo(0.6f).Within(0.0001f));
+            Assert.That(twoLines.ComboMultAdd, Is.EqualTo(1f).Within(0.0001f));
             Assert.That(noCherry.ComboMultAdd, Is.EqualTo(0f));
         }
 
@@ -181,10 +181,10 @@ namespace SlotRogue.UI.Tests.Relics
         [Test]
         public void EventHeal_Kill_GrantsFromR33()
         {
-            // R-33 응급 붕대 = 처치 시 HP +2.
+            // R-33 응급 붕대 = 처치 시 HP +4.
             int heal = RelicSpecRunner.ResolveEventHeal(Own("R-33"), RelicTrigger.OnKill, Ctx());
 
-            Assert.That(heal, Is.EqualTo(2));
+            Assert.That(heal, Is.EqualTo(4));
         }
 
         [Test]
@@ -199,36 +199,36 @@ namespace SlotRogue.UI.Tests.Relics
         [Test]
         public void RuleModifier_SwapCount_SumsAcrossRelics()
         {
-            // R-17 스왑 장인, R-19 시간의 여유 = 각 SwapCountDelta +1.
+            // R-17 스왑 장인 = +1, R-19 시간의 여유 = +2.
             int one = RelicSpecRunner.ResolveRuleModifier(Own("R-17"), RelicEffectKind.SwapCountDelta);
             int two = RelicSpecRunner.ResolveRuleModifier(
                 Own("R-17", "R-19"), RelicEffectKind.SwapCountDelta);
 
             Assert.That(one, Is.EqualTo(1));
-            Assert.That(two, Is.EqualTo(2));
+            Assert.That(two, Is.EqualTo(3));
         }
 
         [Test]
         public void RuleModifier_WrongKind_ReturnsZero()
         {
-            // R-30 VIP 상점권 = ShopOfferDelta +2 (스왑 아님).
-            int swap = RelicSpecRunner.ResolveRuleModifier(Own("R-30"), RelicEffectKind.SwapCountDelta);
-            int offers = RelicSpecRunner.ResolveRuleModifier(Own("R-30"), RelicEffectKind.ShopOfferDelta);
+            // R-28 단골 카드 = ShopDiscount +1 (스왑 아님).
+            int swap = RelicSpecRunner.ResolveRuleModifier(Own("R-28"), RelicEffectKind.SwapCountDelta);
+            int discount = RelicSpecRunner.ResolveRuleModifier(Own("R-28"), RelicEffectKind.ShopDiscount);
 
             Assert.That(swap, Is.EqualTo(0));
-            Assert.That(offers, Is.EqualTo(2));
+            Assert.That(discount, Is.EqualTo(1));
         }
 
         [Test]
         public void RuleModifier_ShopDiscount_SumsFromShopRelics()
         {
-            // R-27 낡은 할인권, R-28 단골 카드 = 각 ShopDiscount +1.
+            // R-28 단골 카드 = -1 할인, R-72 구두쇠의 저울 = -2 할인.
             int one = RelicSpecRunner.ResolveRuleModifier(Own("R-28"), RelicEffectKind.ShopDiscount);
             int two = RelicSpecRunner.ResolveRuleModifier(
-                Own("R-27", "R-28"), RelicEffectKind.ShopDiscount);
+                Own("R-72", "R-28"), RelicEffectKind.ShopDiscount);
 
             Assert.That(one, Is.EqualTo(1));
-            Assert.That(two, Is.EqualTo(2));
+            Assert.That(two, Is.EqualTo(3));
         }
 
         [Test]
@@ -258,13 +258,13 @@ namespace SlotRogue.UI.Tests.Relics
         [Test]
         public void MultipliedBaseDamage_ComboMultAdd_AppliesPerPattern()
         {
-            // R-09 체리 증폭기 = 체리 3개↑ Mult +0.3. 체리족보(10)만 ×1.3 → 13 + 10 = 23.
+            // R-09 체리 증폭기 = 체리 3개↑ Mult +0.5. 체리족보(10)만 ×1.5 → 15 + 10 = 25.
             RelicSpecResolveResult result = RelicSpecRunner.ResolveDamageTurn(
                 Own("R-09"), Ctx(),
                 Pats(Pat(SlotSymbolType.Cherry, 3, baseDamage: 10),
                      Pat(SlotSymbolType.Lemon, 3, baseDamage: 10)));
 
-            Assert.That(result.MultipliedBaseDamage, Is.EqualTo(23));
+            Assert.That(result.MultipliedBaseDamage, Is.EqualTo(25));
         }
 
         [Test]
@@ -300,6 +300,9 @@ namespace SlotRogue.UI.Tests.Relics
                      Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
 
             Assert.That(result.MultipliedBaseDamage, Is.EqualTo(50));
+            Assert.That(result.RetriggerPatternRepeats, Has.Count.EqualTo(1));
+            Assert.That(result.RetriggerPatternRepeats[0].PatternIndex, Is.EqualTo(1));
+            Assert.That(result.RetriggerPatternRepeats[0].Count, Is.EqualTo(1));
         }
 
         [Test]
@@ -312,6 +315,7 @@ namespace SlotRogue.UI.Tests.Relics
                      Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
 
             Assert.That(result.MultipliedBaseDamage, Is.EqualTo(30));
+            Assert.That(result.RetriggerPatternRepeats, Is.Empty);
         }
 
         [Test]
@@ -324,6 +328,28 @@ namespace SlotRogue.UI.Tests.Relics
                      Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
 
             Assert.That(result.MultipliedBaseDamage, Is.EqualTo(60));
+            Assert.That(result.RetriggerPatternRepeats, Has.Count.EqualTo(2));
+            Assert.That(result.RetriggerPatternRepeats[0].PatternIndex, Is.EqualTo(0));
+            Assert.That(result.RetriggerPatternRepeats[0].Count, Is.EqualTo(1));
+            Assert.That(result.RetriggerPatternRepeats[1].PatternIndex, Is.EqualTo(1));
+            Assert.That(result.RetriggerPatternRepeats[1].Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ProposalSpec_P42_RetriggerAll_ReportsPatternRepeats()
+        {
+            RelicSpec p42 = RelicSpecCatalog.GetProposalById("P-42");
+            Assert.That(p42, Is.Not.Null);
+
+            RelicSpecResolveResult result = RelicSpecRunner.ResolveDamageTurn(
+                new List<RelicSpec> { p42 }, Ctx(firstSpin: true),
+                Pats(Pat(SlotSymbolType.Cherry, 3, baseDamage: 10),
+                     Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
+
+            Assert.That(result.MultipliedBaseDamage, Is.EqualTo(60));
+            Assert.That(result.RetriggerPatternRepeats, Has.Count.EqualTo(2));
+            Assert.That(result.RetriggerPatternRepeats[0].PatternIndex, Is.EqualTo(0));
+            Assert.That(result.RetriggerPatternRepeats[1].PatternIndex, Is.EqualTo(1));
         }
 
         [Test]
@@ -336,6 +362,7 @@ namespace SlotRogue.UI.Tests.Relics
                      Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
 
             Assert.That(result.MultipliedBaseDamage, Is.EqualTo(30));
+            Assert.That(result.RetriggerPatternRepeats, Is.Empty);
         }
 
         [Test]
@@ -353,6 +380,9 @@ namespace SlotRogue.UI.Tests.Relics
 
             Assert.That(swapped.MultipliedBaseDamage, Is.EqualTo(50)); // 30 + 최고 20
             Assert.That(noSwap.MultipliedBaseDamage, Is.EqualTo(30));  // 조건 미충족
+            Assert.That(swapped.RetriggerPatternRepeats, Has.Count.EqualTo(1));
+            Assert.That(swapped.RetriggerPatternRepeats[0].PatternIndex, Is.EqualTo(1));
+            Assert.That(noSwap.RetriggerPatternRepeats, Is.Empty);
         }
 
         [Test]
@@ -418,6 +448,95 @@ namespace SlotRogue.UI.Tests.Relics
             Assert.That(noBurn.StatusRequests, Is.Empty); // 4칸 미만이면 조건 미충족
         }
 
+        [Test]
+        public void EnemyStatusCondition_RequiresMatchingSelectedEnemyStatus()
+        {
+            RelicSpecResolveResult burning = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-64"), Ctx(enemyHasBurn: true), Pats(Pat(baseDamage: 10)));
+            RelicSpecResolveResult clean = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-64"), Ctx(enemyHasBurn: false), Pats(Pat(baseDamage: 10)));
+
+            Assert.That(burning.MultipliedBaseDamage, Is.EqualTo(13));
+            Assert.That(clean.MultipliedBaseDamage, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void IncomingDamageMultiplier_ResolvesFromGlassCannon()
+        {
+            float multiplier = RelicSpecRunner.ResolveIncomingDamageMultiplier(Own("R-38"));
+
+            Assert.That(multiplier, Is.EqualTo(1.3f).Within(0.0001f));
+        }
+
+        [Test]
+        public void StatusRelics_RequestFinalV30Amounts()
+        {
+            RelicSpecResolveResult matchbox = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-58"), Ctx(), Pats(Pat(SlotSymbolType.Cherry, 3)));
+            RelicSpecResolveResult oldBellClapper = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-61"), Ctx(), Pats(Pat(SlotSymbolType.Bell, 3)));
+            RelicSpecResolveResult thornArmor = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-62"), Ctx(), Pats(Pat(SlotSymbolType.Clover, 3)));
+
+            Assert.That(matchbox.StatusRequests, Has.Count.EqualTo(1));
+            Assert.That(matchbox.StatusRequests[0].Kind, Is.EqualTo(RelicEffectKind.ApplyBurn));
+            Assert.That(matchbox.StatusRequests[0].Amount, Is.EqualTo(2));
+
+            Assert.That(oldBellClapper.StatusRequests, Has.Count.EqualTo(2));
+            Assert.That(oldBellClapper.StatusRequests[0].Kind, Is.EqualTo(RelicEffectKind.ApplyVulnerable));
+            Assert.That(oldBellClapper.StatusRequests[0].Amount, Is.EqualTo(1));
+            Assert.That(oldBellClapper.StatusRequests[1].Kind, Is.EqualTo(RelicEffectKind.ApplyWeaken));
+            Assert.That(oldBellClapper.StatusRequests[1].Amount, Is.EqualTo(1));
+
+            Assert.That(thornArmor.StatusRequests, Has.Count.EqualTo(1));
+            Assert.That(thornArmor.StatusRequests[0].Kind, Is.EqualTo(RelicEffectKind.GainThorns));
+            Assert.That(thornArmor.StatusRequests[0].Amount, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void LegendaryV30Relics_UseFinalContracts()
+        {
+            RelicSpecResolveResult starCrown = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-56"), Ctx(),
+                Pats(Pat(SlotSymbolType.Cherry, 3, baseDamage: 10),
+                     Pat(SlotSymbolType.Lemon, 3, baseDamage: 10)));
+            RelicSpecResolveResult jackpotEngine = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-57"), Ctx(),
+                Pats(Pat(SlotSymbolType.Cherry, 3, baseDamage: 10),
+                     Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
+            RelicSpecResolveResult painEcho = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-67"), Ctx(firstSpin: false, turn: 3, enemyHasBurn: true),
+                Pats(Pat(SlotSymbolType.Cherry, 3, baseDamage: 10),
+                     Pat(SlotSymbolType.Seven, 3, baseDamage: 20)));
+
+            Assert.That(starCrown.MultipliedBaseDamage, Is.EqualTo(30));
+            Assert.That(jackpotEngine.MultipliedBaseDamage, Is.EqualTo(50));
+            Assert.That(painEcho.MultipliedBaseDamage, Is.EqualTo(50));
+        }
+
+        [Test]
+        public void CurseRelics_ApplyFinalTradeoffs()
+        {
+            Assert.That(
+                RelicSpecRunner.ResolveRuleModifier(Own("R-72"), RelicEffectKind.ShopDiscount),
+                Is.EqualTo(2));
+            Assert.That(
+                RelicSpecRunner.ResolveRuleModifier(Own("R-72"), RelicEffectKind.SwapCountDelta),
+                Is.EqualTo(-1));
+            Assert.That(
+                RelicSpecRunner.ResolveRuleModifier(Own("R-73"), RelicEffectKind.ShopDiscount),
+                Is.EqualTo(-1));
+            Assert.That(
+                RelicSpecRunner.ResolveRuleModifier(Own("R-73"), RelicEffectKind.SwapCountDelta),
+                Is.EqualTo(1));
+
+            RelicSpecResolveResult leadDice = RelicSpecRunner.ResolveDamageTurn(
+                Own("R-74"), Ctx(), Pats(Pat(baseDamage: 20)));
+
+            Assert.That(leadDice.MultipliedBaseDamage, Is.EqualTo(16));
+            Assert.That(leadDice.FlatDamage, Is.EqualTo(8));
+        }
+
         // ── helpers ──────────────────────────────────────────────────────
 
         private static RelicRuntimeContext Ctx(
@@ -426,8 +545,22 @@ namespace SlotRogue.UI.Tests.Relics
             int coins = 0,
             int turn = 1,
             bool firstSpin = false,
-            int patternCount = 1)
-            => new(swappedThisSpin, swappedThisBattle, coins, turn, firstSpin, patternCount);
+            int patternCount = 1,
+            bool enemyHasBurn = false,
+            bool enemyHasInfection = false,
+            bool enemyHasVulnerable = false,
+            bool enemyHasWeaken = false)
+            => new(
+                swappedThisSpin,
+                swappedThisBattle,
+                coins,
+                turn,
+                firstSpin,
+                patternCount,
+                enemyHasBurn,
+                enemyHasInfection,
+                enemyHasVulnerable,
+                enemyHasWeaken);
 
         private static RelicPatternView Pat(
             SlotSymbolType symbol = SlotSymbolType.Cherry,

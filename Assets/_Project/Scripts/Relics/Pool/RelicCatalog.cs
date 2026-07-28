@@ -3,12 +3,12 @@ using System.Collections.Generic;
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// 런타임 유물 카탈로그. v29 기획표의 단일 출처인 <see cref="RelicSpecCatalog"/>(41종)를
+    /// 런타임 유물 카탈로그. v30 기획표의 단일 출처인 <see cref="RelicSpecCatalog"/>(55종)를
     /// 기존 소비처(상점·전투·세이브·부트)가 쓰는 <see cref="RelicDefinition"/> 형태로 변환해 제공한다.
-    /// 구 v23 80종 하드코딩 데이터는 v29 전면 교체로 삭제됨. v29엔 시작(Starter) 등급이 없어
+    /// 구 v23 80종 하드코딩 데이터는 코드 스펙 카탈로그로 교체됨. v30엔 시작(Starter) 등급이 없어
     /// <see cref="Starters"/>는 항상 빈 목록이다(스타터 선택 단계는 이미 비활성).
-    /// 효과 실행 엔진(RelicSpec 러너)은 P1에서 붙는다 — 그전까지 EffectType은 Special로 두어
-    /// 기존 <c>RelicEffectRunner</c>가 아무 효과도 내지 않게 한다(껍데기 상태).
+    /// v30 효과 실행은 <see cref="RelicSpecRunner"/>가 담당하므로, 구 <see cref="RelicEffectType"/>
+    /// 경로에서는 Special로 표시해 기존 <c>RelicEffectRunner</c>가 중복 실행하지 않게 한다.
     /// </summary>
     public static class RelicCatalog
     {
@@ -17,11 +17,11 @@ namespace SlotRogue.Relics.Pool
 
         public static IReadOnlyList<RelicDefinition> All => AllRelics;
 
-        /// <summary>v29엔 시작 유물이 없다. 항상 빈 목록.</summary>
+        /// <summary>v30엔 시작 유물이 없다. 항상 빈 목록.</summary>
         public static IReadOnlyList<RelicDefinition> Starters { get; } =
             System.Array.Empty<RelicDefinition>();
 
-        /// <summary>상점/보상 추첨 풀 — v29 전 유물(시작 등급 없음).</summary>
+        /// <summary>상점/보상 추첨 풀 — v30 전 유물(시작 등급 없음).</summary>
         public static IReadOnlyList<RelicDefinition> RewardPool => AllRelics;
 
         public static RelicDefinition GetById(string id) =>
@@ -36,21 +36,21 @@ namespace SlotRogue.Relics.Pool
             var relics = new RelicDefinition[specs.Count];
             for (int index = 0; index < specs.Count; index++)
             {
-                relics[index] = FromSpec(specs[index]);
+                relics[index] = FromSpec(specs[index], index);
             }
 
             return relics;
         }
 
-        /// <summary>v29 <see cref="RelicSpec"/> 한 개를 런타임 <see cref="RelicDefinition"/>으로 변환한다.</summary>
-        private static RelicDefinition FromSpec(RelicSpec spec)
+        /// <summary>v30 <see cref="RelicSpec"/> 한 개를 런타임 <see cref="RelicDefinition"/>으로 변환한다.</summary>
+        private static RelicDefinition FromSpec(RelicSpec spec, int index)
         {
             RelicRole role = RoleFor(spec.Category);
             return new RelicDefinition(
                 spec.Id,
                 spec.Grade,
                 spec.DisplayName,
-                RelicIconKeys.DefaultFor(role),
+                string.IsNullOrEmpty(spec.IconKey) ? RelicIconKeys.ForIndex(index) : spec.IconKey,
                 role,
                 RelicTriggerType.Passive,
                 RelicEffectType.Special,
@@ -79,6 +79,7 @@ namespace SlotRogue.Relics.Pool
             return category switch
             {
                 "combat" => RelicRole.Damage,
+                "status" => RelicRole.Status,
                 _ => RelicRole.Utility,
             };
         }

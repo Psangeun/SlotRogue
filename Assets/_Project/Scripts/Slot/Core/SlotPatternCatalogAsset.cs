@@ -37,6 +37,7 @@ namespace SlotRogue.Slot.Core
                     case SlotPatternMatchKind.HorizontalRun:
                         AddHorizontalCandidates(spin, entry, candidates);
                         break;
+
                     case SlotPatternMatchKind.FixedCells:
                         TryAddFixedCandidate(spin, entry, candidates);
                         break;
@@ -130,50 +131,17 @@ namespace SlotRogue.Slot.Core
             return null;
         }
 
+        /// <summary>
+        /// 유저에게 보여줄 설명창 전용 패턴 목록.
+        /// 
+        /// 주의:
+        /// - GenerateCandidates()는 판정용 엔트리를 전부 사용한다.
+        /// - 이 함수는 설명창에 보여줄 11개 족보만 반환한다.
+        /// - 세로 5개, 대각 6개처럼 위치별로 나뉜 판정 패턴은 여기서 하나로 묶는다.
+        /// </summary>
         public List<SlotPatternDefinition> GetDefinitionsForDisplay()
         {
-            var definitions = new List<SlotPatternDefinition>();
-
-            if (_entries == null)
-            {
-                return definitions;
-            }
-
-            for (int index = 0; index < _entries.Count; index++)
-            {
-                SlotPatternCatalogEntry entry = _entries[index];
-                if (entry == null || !entry.CanEvaluate)
-                {
-                    continue;
-                }
-
-                definitions.Add(entry.CreateDefinition(entry.BuildCells()));
-            }
-
-            definitions.Sort((left, right) =>
-            {
-                if (left == null && right == null)
-                {
-                    return 0;
-                }
-
-                if (left == null)
-                {
-                    return 1;
-                }
-
-                if (right == null)
-                {
-                    return -1;
-                }
-
-                int orderCompare = left.OrderIndex.CompareTo(right.OrderIndex);
-                return orderCompare != 0
-                    ? orderCompare
-                    : string.Compare(left.PatternId, right.PatternId, StringComparison.Ordinal);
-            });
-
-            return definitions;
+            return CreateDescriptionDisplayDefinitions();
         }
 
         public void ResetToDefaults()
@@ -244,12 +212,14 @@ namespace SlotRogue.Slot.Core
                     messages.Add($"Pattern id '{entry.PatternId}' is duplicated.");
                 }
 
-                if (entry.MatchKind == SlotPatternMatchKind.HorizontalRun && entry.HorizontalLength <= 0)
+                if (entry.MatchKind == SlotPatternMatchKind.HorizontalRun &&
+                    entry.HorizontalLength <= 0)
                 {
                     messages.Add($"Pattern '{entry.PatternId}' has an invalid horizontal length.");
                 }
 
-                if (entry.MatchKind == SlotPatternMatchKind.FixedCells && entry.CellCount == 0)
+                if (entry.MatchKind == SlotPatternMatchKind.FixedCells &&
+                    entry.CellCount == 0)
                 {
                     messages.Add($"Pattern '{entry.PatternId}' has no cells.");
                 }
@@ -290,6 +260,265 @@ namespace SlotRogue.Slot.Core
             }
         }
 
+        private List<SlotPatternDefinition> CreateDescriptionDisplayDefinitions()
+        {
+            return new List<SlotPatternDefinition>
+            {
+                CreateDisplayDefinition(
+                    FindEntryById("horizontal-sm"),
+                    "horizontal-sm",
+                    "가로 3칸",
+                    0,
+                    1.0f,
+                    SlotPatternRank.HorizontalSm,
+                    false,
+                    BuildHorizontalCells(1, 1, 3)),
+
+                CreateDisplayDefinition(
+                    FindFirstEntryByRank(SlotPatternRank.Vertical),
+                    "vertical",
+                    "세로 3칸",
+                    1,
+                    1.0f,
+                    SlotPatternRank.Vertical,
+                    false,
+                    BuildVerticalCells(2)),
+
+                CreateDisplayDefinition(
+                    FindFirstEntryByRank(SlotPatternRank.Diagonal),
+                    "diagonal",
+                    "대각 3칸",
+                    2,
+                    1.0f,
+                    SlotPatternRank.Diagonal,
+                    false,
+                    BuildDiagonalCells()),
+
+                CreateDisplayDefinition(
+                    FindEntryById("horizontal-lg"),
+                    "horizontal-lg",
+                    "가로 4칸",
+                    3,
+                    2.0f,
+                    SlotPatternRank.HorizontalLg,
+                    false,
+                    BuildHorizontalCells(0, 1, 4)),
+
+                CreateDisplayDefinition(
+                    FindEntryById("horizontal-xl"),
+                    "horizontal-xl",
+                    "가로 5칸",
+                    4,
+                    3.0f,
+                    SlotPatternRank.HorizontalXL,
+                    false,
+                    BuildHorizontalCells(0, 1, 5)),
+
+                CreateDisplayDefinition(
+                    FindEntryById("zig"),
+                    "zig",
+                    "지그재그",
+                    5,
+                    4.0f,
+                    SlotPatternRank.Zig,
+                    false,
+                    new[]
+                    {
+                        new SlotCell(2, 0),
+                        new SlotCell(1, 1),
+                        new SlotCell(3, 1),
+                        new SlotCell(0, 2),
+                        new SlotCell(4, 2)
+                    }),
+
+                CreateDisplayDefinition(
+                    FindEntryById("zag"),
+                    "zag",
+                    "역지그재그",
+                    6,
+                    4.0f,
+                    SlotPatternRank.Zag,
+                    false,
+                    new[]
+                    {
+                        new SlotCell(0, 0),
+                        new SlotCell(4, 0),
+                        new SlotCell(1, 1),
+                        new SlotCell(3, 1),
+                        new SlotCell(2, 2)
+                    }),
+
+                CreateDisplayDefinition(
+                    FindEntryById("ground"),
+                    "ground",
+                    "대지",
+                    7,
+                    7.0f,
+                    SlotPatternRank.Ground,
+                    false,
+                    new[]
+                    {
+                        new SlotCell(2, 0),
+                        new SlotCell(1, 1),
+                        new SlotCell(3, 1),
+                        new SlotCell(0, 2),
+                        new SlotCell(1, 2),
+                        new SlotCell(2, 2),
+                        new SlotCell(3, 2),
+                        new SlotCell(4, 2)
+                    }),
+
+                CreateDisplayDefinition(
+                    FindEntryById("heaven"),
+                    "heaven",
+                    "천상",
+                    8,
+                    7.0f,
+                    SlotPatternRank.Heaven,
+                    false,
+                    new[]
+                    {
+                        new SlotCell(0, 0),
+                        new SlotCell(1, 0),
+                        new SlotCell(2, 0),
+                        new SlotCell(3, 0),
+                        new SlotCell(4, 0),
+                        new SlotCell(1, 1),
+                        new SlotCell(3, 1),
+                        new SlotCell(2, 2)
+                    }),
+
+                CreateDisplayDefinition(
+                    FindEntryById("eye"),
+                    "eye",
+                    "눈",
+                    9,
+                    8.0f,
+                    SlotPatternRank.Eye,
+                    false,
+                    new[]
+                    {
+                        new SlotCell(1, 0),
+                        new SlotCell(2, 0),
+                        new SlotCell(3, 0),
+                        new SlotCell(0, 1),
+                        new SlotCell(1, 1),
+                        new SlotCell(3, 1),
+                        new SlotCell(4, 1),
+                        new SlotCell(1, 2),
+                        new SlotCell(2, 2),
+                        new SlotCell(3, 2)
+                    }),
+
+                CreateDisplayDefinition(
+                    FindEntryById("jackpot"),
+                    "jackpot",
+                    "잭팟",
+                    10,
+                    10.0f,
+                    SlotPatternRank.Jackpot,
+                    true,
+                    BuildAllCells())
+            };
+        }
+
+        private SlotPatternCatalogEntry FindEntryById(string patternId)
+        {
+            if (string.IsNullOrWhiteSpace(patternId) || _entries == null)
+            {
+                return null;
+            }
+
+            for (int index = 0; index < _entries.Count; index++)
+            {
+                SlotPatternCatalogEntry entry = _entries[index];
+
+                if (entry != null &&
+                    string.Equals(entry.PatternId, patternId, StringComparison.Ordinal))
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private SlotPatternCatalogEntry FindFirstEntryByRank(SlotPatternRank rank)
+        {
+            if (_entries == null)
+            {
+                return null;
+            }
+
+            for (int index = 0; index < _entries.Count; index++)
+            {
+                SlotPatternCatalogEntry entry = _entries[index];
+
+                if (entry != null && entry.Rank == rank)
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private static SlotPatternDefinition CreateDisplayDefinition(
+            SlotPatternCatalogEntry source,
+            string patternId,
+            string displayName,
+            int orderIndex,
+            float fallbackMultiplier,
+            SlotPatternRank rank,
+            bool isJackpot,
+            IReadOnlyList<SlotCell> cells)
+        {
+            float multiplier = source != null
+                ? source.Multiplier
+                : fallbackMultiplier;
+
+            return new SlotPatternDefinition(
+                patternId,
+                displayName,
+                orderIndex,
+                multiplier,
+                rank,
+                isJackpot,
+                cells ?? Array.Empty<SlotCell>());
+        }
+
+        private static SlotCell[] BuildHorizontalCells(int startColumn, int row, int length)
+        {
+            var cells = new SlotCell[length];
+
+            for (int index = 0; index < length; index++)
+            {
+                cells[index] = new SlotCell(startColumn + index, row);
+            }
+
+            return cells;
+        }
+
+        private static SlotCell[] BuildVerticalCells(int column)
+        {
+            return new[]
+            {
+                new SlotCell(column, 0),
+                new SlotCell(column, 1),
+                new SlotCell(column, 2)
+            };
+        }
+
+        private static SlotCell[] BuildDiagonalCells()
+        {
+            return new[]
+            {
+                new SlotCell(1, 0),
+                new SlotCell(2, 1),
+                new SlotCell(3, 2)
+            };
+        }
+
         private static void AddHorizontalCandidates(
             SlotSpinResult spin,
             SlotPatternCatalogEntry entry,
@@ -314,9 +543,17 @@ namespace SlotRogue.Slot.Core
 
                     if (runLength >= length)
                     {
-                        for (int startColumn = column; startColumn <= column + runLength - length; startColumn++)
+                        for (int startColumn = column;
+                             startColumn <= column + runLength - length;
+                             startColumn++)
                         {
-                            AddHorizontalCandidate(entry, symbol, startColumn, row, length, candidates);
+                            AddHorizontalCandidate(
+                                entry,
+                                symbol,
+                                startColumn,
+                                row,
+                                length,
+                                candidates);
                         }
                     }
 
@@ -363,7 +600,8 @@ namespace SlotRogue.Slot.Core
             {
                 SlotCell cell = cells[index];
 
-                if (!IsCellInBounds(cell) || spin.GetSymbol(cell.Col, cell.Row) != symbol)
+                if (!IsCellInBounds(cell) ||
+                    spin.GetSymbol(cell.Col, cell.Row) != symbol)
                 {
                     return;
                 }
@@ -392,6 +630,7 @@ namespace SlotRogue.Slot.Core
                     1.0f,
                     SlotPatternRank.HorizontalSm,
                     3),
+
                 SlotPatternCatalogEntry.Horizontal(
                     "horizontal-lg",
                     "가로 4칸",
@@ -399,6 +638,7 @@ namespace SlotRogue.Slot.Core
                     2.0f,
                     SlotPatternRank.HorizontalLg,
                     4),
+
                 SlotPatternCatalogEntry.Horizontal(
                     "horizontal-xl",
                     "가로 5칸",
@@ -410,6 +650,7 @@ namespace SlotRogue.Slot.Core
 
             AddVerticalEntries(entries);
             AddDiagonalEntries(entries);
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "zig",
                 "지그재그",
@@ -427,6 +668,7 @@ namespace SlotRogue.Slot.Core
                     new SlotCell(0, 2),
                     new SlotCell(4, 2)
                 }));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "zag",
                 "역지그재그",
@@ -444,6 +686,7 @@ namespace SlotRogue.Slot.Core
                     new SlotCell(3, 1),
                     new SlotCell(2, 2)
                 }));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "ground",
                 "대지",
@@ -464,6 +707,7 @@ namespace SlotRogue.Slot.Core
                     new SlotCell(3, 2),
                     new SlotCell(4, 2)
                 }));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "heaven",
                 "천상",
@@ -484,6 +728,7 @@ namespace SlotRogue.Slot.Core
                     new SlotCell(3, 1),
                     new SlotCell(2, 2)
                 }));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "eye",
                 "눈",
@@ -506,6 +751,7 @@ namespace SlotRogue.Slot.Core
                     new SlotCell(2, 2),
                     new SlotCell(3, 2)
                 }));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "jackpot",
                 "잭팟",
@@ -516,6 +762,7 @@ namespace SlotRogue.Slot.Core
                 true,
                 false,
                 BuildAllCells()));
+
             entries.Add(SlotPatternCatalogEntry.Fixed(
                 "forced-horizontal-xl-row1",
                 "가로 5칸",
@@ -561,12 +808,101 @@ namespace SlotRogue.Slot.Core
 
         private static void AddDiagonalEntries(List<SlotPatternCatalogEntry> entries)
         {
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-bs0", "역대각 1", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(0, 0), new SlotCell(1, 1), new SlotCell(2, 2) }));
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-bs1", "역대각 2", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(1, 0), new SlotCell(2, 1), new SlotCell(3, 2) }));
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-bs2", "역대각 3", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(2, 0), new SlotCell(3, 1), new SlotCell(4, 2) }));
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-s0", "정대각 1", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(2, 0), new SlotCell(1, 1), new SlotCell(0, 2) }));
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-s1", "정대각 2", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(3, 0), new SlotCell(2, 1), new SlotCell(1, 2) }));
-            entries.Add(SlotPatternCatalogEntry.Fixed("diag-s2", "정대각 3", 2, 1.0f, SlotPatternRank.Diagonal, false, true, true, new[] { new SlotCell(4, 0), new SlotCell(3, 1), new SlotCell(2, 2) }));
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-bs0",
+                "역대각 1",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(0, 0),
+                    new SlotCell(1, 1),
+                    new SlotCell(2, 2)
+                }));
+
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-bs1",
+                "역대각 2",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(1, 0),
+                    new SlotCell(2, 1),
+                    new SlotCell(3, 2)
+                }));
+
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-bs2",
+                "역대각 3",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(2, 0),
+                    new SlotCell(3, 1),
+                    new SlotCell(4, 2)
+                }));
+
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-s0",
+                "정대각 1",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(2, 0),
+                    new SlotCell(1, 1),
+                    new SlotCell(0, 2)
+                }));
+
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-s1",
+                "정대각 2",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(3, 0),
+                    new SlotCell(2, 1),
+                    new SlotCell(1, 2)
+                }));
+
+            entries.Add(SlotPatternCatalogEntry.Fixed(
+                "diag-s2",
+                "정대각 3",
+                2,
+                1.0f,
+                SlotPatternRank.Diagonal,
+                false,
+                true,
+                true,
+                new[]
+                {
+                    new SlotCell(4, 0),
+                    new SlotCell(3, 1),
+                    new SlotCell(2, 2)
+                }));
         }
 
         private static SlotCell[] BuildAllCells()
@@ -614,7 +950,10 @@ namespace SlotRogue.Slot.Core
         public bool CanForce => _enabled && _includeInForcedPatternPool;
         public SlotPatternMatchKind MatchKind => _matchKind;
         public string PatternId => _patternId;
+        public string DisplayName => _displayName;
         public int OrderIndex => _orderIndex;
+        public float Multiplier => _multiplier;
+        public SlotPatternRank Rank => _rank;
         public bool IsJackpot => _isJackpot;
         public int HorizontalLength => Clamp(_horizontalLength, 1, SlotSpinResult.Columns);
         public int CellCount => _cells != null ? _cells.Count : 0;

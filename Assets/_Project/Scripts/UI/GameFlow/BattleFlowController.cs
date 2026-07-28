@@ -8,6 +8,7 @@ using SlotRogue.Relics.Pool;
 using SlotRogue.Slot.Data;
 using SlotRogue.UI.Combat;
 using SlotRogue.UI.Combat.Presentation;
+using SlotRogue.UI.SlotPresentation;
 
 namespace SlotRogue.UI.GameFlow
 {
@@ -28,6 +29,7 @@ namespace SlotRogue.UI.GameFlow
         private readonly CancellationToken _presentationCancellationToken;
         private readonly RelicContributionAccumulator _relicContributions = new();
         private readonly SlotSymbolContributionAccumulator _slotSymbolContributions = new();
+        private readonly Random _againMarkRng = new();
 
         private BattleFlowContext _context;
         private UniTaskCompletionSource _attackTcs;
@@ -63,6 +65,9 @@ namespace SlotRogue.UI.GameFlow
             _screenController.SpinRequested += HandleSpinRequested;
             _screenController.AttackRequested += HandleAttackRequested;
             _screenController.SlotSwapRequested += HandleSlotSwapRequested;
+            _slotTurnController.PatternPresentationStarted += HandlePatternPresentationStarted;
+            _slotTurnController.PatternPresentationCompleted += HandlePatternPresentationCompleted;
+            _slotTurnController.LeverRaiseStarted += HandleLeverRaiseStarted;
         }
 
         public event Action<BattleFlowResult> BattleCompleted;
@@ -81,6 +86,7 @@ namespace SlotRogue.UI.GameFlow
             _spinTurnIndex = 0;
 
             _slotTurnController.SetupImmediate();
+            RefreshEnemyDamageToPlayerMultiplier();
             _battle.StartBattle(_context.Player, ExtractEnemyCombatants(_context.EncounterRoster));
             _combatViewModel.SyncFrom(_battle);
             _screenController.BeginBattle(
@@ -96,10 +102,13 @@ namespace SlotRogue.UI.GameFlow
         }
 
         /// <summary>
-        /// v29 유물 실행 엔진(<see cref="RelicSpecRunner"/>)을 이번 스핀에 적용한 결과를 계산한다.
+        /// v30 유물 실행 엔진(<see cref="RelicSpecRunner"/>)을 이번 스핀에 적용한 결과를 계산한다.
         /// 보유 유물이 없으면 null(적용 없음).
         /// </summary>
-        private RelicSpecResolveResult ResolveSpecResult(IReadOnlyList<SlotPatternMatch> patternMatches)
+        private RelicSpecResolveResult ResolveSpecResult(
+            IReadOnlyList<SlotPatternMatch> patternMatches,
+            IReadOnlyList<bool> againMarks,
+            CombatParticipantId selectedTargetId)
         {
             IReadOnlyList<RelicSpec> ownedSpecs = BuildOwnedSpecs(_context.OwnedRelics);
             if (ownedSpecs.Count == 0)
@@ -107,18 +116,23 @@ namespace SlotRogue.UI.GameFlow
                 return null;
             }
 
+            CombatParticipant selectedEnemy = FindEnemy(_battle, selectedTargetId);
             var runtimeContext = new RelicRuntimeContext(
                 _swappedThisTurn,
                 _swappedThisBattle,
                 GameFlowSession.RunCoins,
                 _spinTurnIndex,
                 _spinTurnIndex == 1,
-                patternMatches?.Count ?? 0);
+                patternMatches?.Count ?? 0,
+                HasStatus(selectedEnemy, StatusEffectKind.Burn),
+                HasStatus(selectedEnemy, StatusEffectKind.Infection),
+                HasStatus(selectedEnemy, StatusEffectKind.Vulnerable),
+                HasStatus(selectedEnemy, StatusEffectKind.Weaken));
 
             return RelicSpecRunner.ResolveDamageTurn(
                 ownedSpecs,
                 runtimeContext,
-                BuildRelicPatternViews(patternMatches, _swappedThisTurn));
+                BuildRelicPatternViews(patternMatches, _swappedThisTurn, againMarks));
         }
 
         /// <summary>엔진이 만든 가산 피해(FlatDamage)/회복(Heal)/기여를 기존 유물 결과에 합류시킨다.</summary>
@@ -207,6 +221,15 @@ namespace SlotRogue.UI.GameFlow
             _spinTurnIndex == 1,
             0);
 
+        // 보유 유물/제안(OnSpinGenerate + AddAgainMark)을 이번 스핀 보드에 적용해 [다시] 표식 칸을 계산한다.
+        private bool[] BuildAgainMarks(SlotSpinResult spinResult)
+        {
+            return RelicSpecRunner.ResolveAgainMarks(
+                BuildOwnedSpecs(_context.OwnedRelics),
+                spinResult?.Symbols,
+                _againMarkRng);
+        }
+
         private static IReadOnlyList<RelicSpec> BuildOwnedSpecs(IReadOnlyList<RelicDefinition> owned)
         {
             var specs = new List<RelicSpec>();
@@ -240,7 +263,8 @@ namespace SlotRogue.UI.GameFlow
 
         private static IReadOnlyList<RelicPatternView> BuildRelicPatternViews(
             IReadOnlyList<SlotPatternMatch> matches,
-            bool swappedThisSpin)
+            bool swappedThisSpin,
+            IReadOnlyList<bool> againMarks)
         {
             var views = new List<RelicPatternView>();
             if (matches == null)
@@ -257,13 +281,49 @@ namespace SlotRogue.UI.GameFlow
                 }
 
                 int size = match.MatchedCells.Count;
+                int againInPattern = CountAgainMarksInPattern(match, againMarks);
                 // madeBySwap 근사: 이번 스핀에 스왑을 썼으면 그 스핀 족보를 swap-made로 본다(정밀 추적은 추후).
                 // wholeLineSameSymbol은 5칸 매치로 근사. CalculatedValue = 이 족보의 기본 피해(배율 모델이 곱함).
+                // againInPattern = 이 족보에 든 [다시] 표식 수 — 그 수만큼 이 족보가 추가 발동한다.
                 views.Add(new RelicPatternView(
-                    match.Symbol, size, swappedThisSpin, size >= 5, match.CalculatedValue));
+                    match.Symbol, size, swappedThisSpin, size >= 5, match.CalculatedValue, againInPattern));
             }
 
             return views;
+        }
+
+        private static int CountAgainMarksInPattern(
+            SlotPatternMatch match,
+            IReadOnlyList<bool> againMarks)
+        {
+            if (againMarks == null || match?.MatchedCells == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int cellIndex = 0; cellIndex < match.MatchedCells.Count; cellIndex++)
+            {
+                SlotCell cell = match.MatchedCells[cellIndex];
+                int flatIndex = SlotSpinResult.ToIndex(cell.Col, cell.Row);
+                if (flatIndex >= 0 && flatIndex < againMarks.Count && againMarks[flatIndex])
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        public void DevApplyRelicStatusTurn(
+            StatusEffectKind statusEffectKind,
+            int amount,
+            CombatTargetMode targetMode)
+        {
+            DevApplyRelicStatusTurnAsync(
+                statusEffectKind,
+                amount,
+                targetMode).Forget();
         }
 
         public void Dispose()
@@ -271,6 +331,9 @@ namespace SlotRogue.UI.GameFlow
             _screenController.SpinRequested -= HandleSpinRequested;
             _screenController.AttackRequested -= HandleAttackRequested;
             _screenController.SlotSwapRequested -= HandleSlotSwapRequested;
+            _slotTurnController.PatternPresentationStarted -= HandlePatternPresentationStarted;
+            _slotTurnController.PatternPresentationCompleted -= HandlePatternPresentationCompleted;
+            _slotTurnController.LeverRaiseStarted -= HandleLeverRaiseStarted;
             _screenController.Dispose();
         }
 
@@ -313,6 +376,21 @@ namespace SlotRogue.UI.GameFlow
             _attackTcs?.TrySetResult();
         }
 
+        private void HandleLeverRaiseStarted()
+        {
+            _screenController.RefillSwapForSpin();
+        }
+
+        private void HandlePatternPresentationStarted(SlotPatternPresentationResult pattern)
+        {
+            _screenController.ShowCurrentPatternResult(pattern);
+        }
+
+        private void HandlePatternPresentationCompleted(SlotPatternPresentationResult pattern)
+        {
+            _screenController.HideCurrentPatternResult();
+        }
+
         private void HandleSlotSwapRequested(int firstIndex, int secondIndex)
         {
             HandleSlotSwapRequestedAsync(firstIndex, secondIndex).Forget();
@@ -347,6 +425,8 @@ namespace SlotRogue.UI.GameFlow
             // 연출이 끝나 보드가 정착한 뒤에 새 족보 하이라이트를 그린다.
             // 연출 중에 다시 그리면 이동하는 고스트 뒤로 하이라이트/심볼 잔상이 비친다.
             await animation.AttachExternalCancellation(_presentationCancellationToken);
+            // 표식은 심볼을 따라 이동했다(모델). 정착된 보드에 [다시] 아이콘을 다시 반영한다.
+            _slotTurnController.RefreshAgainMarks();
             _screenController.UpdateSwapDecisionResult(_pendingSlotTurnResult);
         }
 
@@ -364,8 +444,12 @@ namespace SlotRogue.UI.GameFlow
 
             try
             {
+                // 전투 이벤트가 없는 예외 흐름에서도 다음 스핀 입력 전에는 스왑 게이지가 차 있도록 보정한다.
+                _screenController.RefillSwapForSpin();
                 SlotTurnResult slotTurnResult = await _slotTurnController.SpinAsync(
                     new SlotTurnRequest(_presentationCancellationToken));
+                // 스핀 보드가 나오면 보유 유물/제안의 [다시] 표식을 계산해 모델에 주입하고 릴에 아이콘을 표시한다.
+                _slotTurnController.ApplyAgainMarks(BuildAgainMarks(slotTurnResult.SpinResult));
                 // 별조각(런 코인)은 공격 확정 시점에 지급한다. 스왑을 넛지로 쓰면 이번 턴 보상은 0.
                 _swappedThisTurn = false;
                 _pendingSwapAnimation = UniTask.CompletedTask;
@@ -391,7 +475,10 @@ namespace SlotRogue.UI.GameFlow
                     _context.OwnedRelics,
                     slotTurnResult.PatternMatches,
                     RelicTurnContext.FromBattle(_battle, selectedTargetId));
-                RelicSpecResolveResult specResult = ResolveSpecResult(slotTurnResult.PatternMatches);
+                RelicSpecResolveResult specResult = ResolveSpecResult(
+                    slotTurnResult.PatternMatches,
+                    slotTurnResult.AgainMarks,
+                    selectedTargetId);
                 relicResult = MergeSpecResult(relicResult, specResult);
                 SlotCombatRequest baseCombatRequest = slotTurnResult.BaseCombatRequest;
                 if (specResult != null)
@@ -440,9 +527,11 @@ namespace SlotRogue.UI.GameFlow
                     slotTurnResult,
                     relicResult,
                     requestResult,
-                    _presentationCancellationToken);
+                    specResult,
+                        _presentationCancellationToken);
                 TutorialSignalRaised?.Invoke(BattleTutorialSignal.SlotPresentationCompleted);
 
+                RefreshEnemyDamageToPlayerMultiplier();
                 BattleApplyResult result = _battle.ApplyPlayerTurn(playerEffects, selectedTargetId);
                 if (result.Accepted)
                 {
@@ -461,6 +550,79 @@ namespace SlotRogue.UI.GameFlow
                 _pendingSlotTurnResult = null;
                 _slotTurnController.ResetImmediate();
                 _screenController.EndSwapDecision();
+                _turnRunning = false;
+                CompleteBattleIfNeeded();
+                _screenController.Refresh();
+            }
+        }
+
+        private async UniTaskVoid DevApplyRelicStatusTurnAsync(
+            StatusEffectKind statusEffectKind,
+            int amount,
+            CombatTargetMode targetMode)
+        {
+            if (statusEffectKind == StatusEffectKind.None || !CanStartTurn())
+            {
+                _screenController.Refresh();
+                return;
+            }
+
+            CombatParticipantId selectedTargetId = _screenController.SelectedEnemyId;
+            if (targetMode == CombatTargetMode.SelectedEnemy && !selectedTargetId.IsValid)
+            {
+                return;
+            }
+
+            _screenController.SetSpinInteractable(false);
+            _turnRunning = true;
+
+            try
+            {
+                var request = new SlotCombatRequest(
+                    damage: 0,
+                    defense: 0,
+                    attackCount: 1,
+                    healAmount: 0,
+                    isCritical: false,
+                    patternName: $"DEV {statusEffectKind}");
+                StatusEffectRequest[] statusRequests =
+                {
+                    new(
+                        statusEffectKind,
+                        Math.Max(1, amount),
+                        targetMode),
+                };
+                var requestResult = new RunCombatRequestResult(
+                    baseRequest: request,
+                    finalRequest: request,
+                    relicActivationSummary: $"DEV RELIC: {statusEffectKind} {Math.Max(1, amount)}",
+                    runBonusSummary: string.Empty,
+                    statusEffectsToApply: CombatTurnRequestBuilder.BuildStatusEffectSpecs(statusRequests));
+                _screenController.UpdateTurnResult(null, requestResult);
+
+                CombatEffect[] playerEffects = _converter.Convert(
+                    requestResult.FinalRequest,
+                    selectedTargetId,
+                    requestResult.StatusEffectsToApply);
+                var presentationContext =
+                    new PresentationContext(isCritical: false, requestResult.FinalRequest.PatternName);
+                int eventCursor = _battle.Events.Count;
+                RefreshEnemyDamageToPlayerMultiplier();
+                BattleApplyResult result = _battle.ApplyPlayerTurn(playerEffects, selectedTargetId);
+
+                if (result.Accepted)
+                {
+                    await _battlePresentationController.PresentEventsAsync(
+                        _battle,
+                        eventCursor,
+                        presentationContext,
+                        _presentationCancellationToken,
+                        BeforeBattleEventPresentedAsync,
+                        AfterBattleEventPresentedAsync);
+                }
+            }
+            finally
+            {
                 _turnRunning = false;
                 CompleteBattleIfNeeded();
                 _screenController.Refresh();
@@ -568,6 +730,59 @@ namespace SlotRogue.UI.GameFlow
             }
 
             return combatants;
+        }
+
+        private void RefreshEnemyDamageToPlayerMultiplier()
+        {
+            _battle.EnemyDamageToPlayerMultiplier = GameFlowSession.IncomingDamageMultiplier;
+        }
+
+        private static bool HasStatus(CombatParticipant participant, StatusEffectKind kind)
+        {
+            if (participant == null)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < participant.StatusEffects.Count; index++)
+            {
+                if (participant.StatusEffects[index].Kind == kind)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static CombatParticipant FindEnemy(
+            BattleSystem battle,
+            CombatParticipantId selectedTargetId)
+        {
+            if (battle == null)
+            {
+                return null;
+            }
+
+            for (int index = 0; index < battle.Enemies.Count; index++)
+            {
+                CombatParticipant enemy = battle.Enemies[index];
+                if (selectedTargetId.IsValid && enemy.Id.Value == selectedTargetId.Value)
+                {
+                    return enemy;
+                }
+            }
+
+            for (int index = 0; index < battle.Enemies.Count; index++)
+            {
+                CombatParticipant enemy = battle.Enemies[index];
+                if (!enemy.IsDead)
+                {
+                    return enemy;
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -17,8 +17,8 @@ namespace SlotRogue.UI.Tests.Leaderboard
                 new[] { "S-01", "C-04", "C-04" },
                 new[]
                 {
-                    new LeaderboardSymbolCount(SlotSymbolType.Cherry.ToString(), 9),
-                    new LeaderboardSymbolCount(SlotSymbolType.Seven.ToString(), 3),
+                    new LeaderboardSymbolCount(SlotSymbolType.Cherry.ToString(), 9f),
+                    new LeaderboardSymbolCount(SlotSymbolType.Seven.ToString(), 3f),
                 },
                 "profile-01",
                 "허접ㅋ");
@@ -31,7 +31,7 @@ namespace SlotRogue.UI.Tests.Leaderboard
             Assert.That(parsed.RelicIds, Is.EqualTo(new[] { "S-01", "C-04", "C-04" }));
             Assert.That(parsed.SymbolCounts.Length, Is.EqualTo(2));
             Assert.That(parsed.SymbolCounts[0].Symbol, Is.EqualTo("Cherry"));
-            Assert.That(parsed.SymbolCounts[0].Count, Is.EqualTo(9));
+            Assert.That(parsed.SymbolCounts[0].Count, Is.EqualTo(9f));
             Assert.That(parsed.ProfileIconId, Is.EqualTo("profile-01"));
             Assert.That(parsed.Message, Is.EqualTo("허접ㅋ"));
         }

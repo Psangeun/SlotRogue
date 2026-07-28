@@ -125,7 +125,7 @@ namespace SlotRogue.UI.Tests.GameFlow
             var relicDeltas = new[]
             {
                 new RelicContributionDelta(
-                    "R-02",
+                    "R-04",
                     "Lemon Shield",
                     damagePerHit: 0,
                     block: 9,

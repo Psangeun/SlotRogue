@@ -35,6 +35,7 @@ namespace SlotRogue.UI.SlotPresentation
         public event Action SlotSpinCompleted;
         public event Action<int> SlotReelStopped;
         public event Action<SlotPatternPresentationResult> PatternStepStarted;
+        public event Action<SlotPatternPresentationResult> PatternStepCompleted;
 
         public bool IsPlaying => _playRoutine != null;
 
@@ -359,6 +360,20 @@ namespace SlotRogue.UI.SlotPresentation
             onCompleted?.Invoke();
         }
 
+        /// <summary>정착된 보드에 "다시" 표식을 반영한다(릴이 멈춘 뒤 호출).</summary>
+        public void ShowAgainMarks(IReadOnlyList<bool> marks)
+        {
+            SlotMachineSpinDirector presenter = EnsureSpinPresenter();
+            presenter?.ShowAgainMarks(marks);
+        }
+
+        /// <summary>보드의 모든 "다시" 표식을 끈다.</summary>
+        public void ClearAgainMarks()
+        {
+            SlotMachineSpinDirector presenter = EnsureSpinPresenter();
+            presenter?.ClearAgainMarks();
+        }
+
         public void SetSymbolSprites(Sprite[] symbolSprites, Sprite[] spinSymbolSprites)
         {
             _slotCellSpinView?.SetSymbolSprites(symbolSprites, spinSymbolSprites);
@@ -528,6 +543,8 @@ namespace SlotRogue.UI.SlotPresentation
             {
                 yield return relicRoutine;
             }
+
+            PatternStepCompleted?.Invoke(pattern);
         }
 
         private IEnumerator PlayRemainingRelics(
@@ -922,6 +939,7 @@ namespace SlotRogue.UI.SlotPresentation
                 if (_spinPresenter != null)
                 {
                     _spinPresenter.StopImmediate();
+                    _spinPresenter.ClearAgainMarks();
                 }
                 else if (_slotCellSpinView != null)
                 {

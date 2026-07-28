@@ -3,19 +3,20 @@ using System.Collections.Generic;
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// v29 유물(<see cref="RelicSpec"/>)을 이번 스핀 족보/런타임 상태에 적용해 "이번 턴 전투에 넘길 값"만
-    /// 계산한 결과. 전투를 직접 실행하지 않고 델타·배율만 만든다(상위 레이어가 소비).
+    /// v30 유물(<see cref="RelicSpec"/>)을 이번 스핀 족보/런타임 상태에 적용해 "이번 턴 전투에 넘길 값"만
+    /// 계산한 결과. 전투를 직접 실행하지 않고 델타·배율만 만들며 상위 레이어가 소비한다.
     ///
-    /// P1 슬라이스: OnDamageResolve 트리거의 즉시 적용 효과(<see cref="FlatDamage"/>/<see cref="Heal"/>)와
+    /// OnDamageResolve 트리거의 즉시 적용 효과(<see cref="FlatDamage"/>/<see cref="Heal"/>)와
     /// 배율 데이터(<see cref="ComboMultAdd"/>/<see cref="SpecialMult"/>/<see cref="FinalMult"/>/
-    /// <see cref="IncomingDamageMul"/>)를 산출한다. 배율의 실제 피해 적용은 P2(배율 피해 모델)에서 소비한다.
+    /// <see cref="IncomingDamageMul"/>)를 산출한다. 공격 배율은 슬롯 전투 요청 경로에서, 받는 피해 배율은 적 행동 적용 직전에 소비한다.
     /// </summary>
     public sealed class RelicSpecResolveResult
     {
         public static readonly RelicSpecResolveResult Empty = new(
             0, 0, 0, 0f, 1f, 1f, 1f,
             System.Array.Empty<RelicSpecContribution>(),
-            System.Array.Empty<RelicSpecStatusRequest>());
+            System.Array.Empty<RelicSpecStatusRequest>(),
+            System.Array.Empty<RelicPatternRepeat>());
 
         public RelicSpecResolveResult(
             int multipliedBaseDamage,
@@ -26,7 +27,8 @@ namespace SlotRogue.Relics.Pool
             float finalMult,
             float incomingDamageMul,
             IReadOnlyList<RelicSpecContribution> contributions,
-            IReadOnlyList<RelicSpecStatusRequest> statusRequests)
+            IReadOnlyList<RelicSpecStatusRequest> statusRequests,
+            IReadOnlyList<RelicPatternRepeat> retriggerPatternRepeats = null)
         {
             MultipliedBaseDamage = multipliedBaseDamage;
             FlatDamage = flatDamage;
@@ -37,6 +39,7 @@ namespace SlotRogue.Relics.Pool
             IncomingDamageMul = incomingDamageMul;
             Contributions = contributions ?? System.Array.Empty<RelicSpecContribution>();
             StatusRequests = statusRequests ?? System.Array.Empty<RelicSpecStatusRequest>();
+            RetriggerPatternRepeats = retriggerPatternRepeats ?? System.Array.Empty<RelicPatternRepeat>();
         }
 
         /// <summary>
@@ -51,7 +54,7 @@ namespace SlotRogue.Relics.Pool
         /// <summary>이번 턴 회복량(Heal 합).</summary>
         public int Heal { get; }
 
-        /// <summary>콤보배율 가산 합(P2에서 base×(1+ComboMultAdd) 등으로 소비).</summary>
+        /// <summary>콤보배율 가산 합(base×(1+ComboMultAdd) 등으로 소비).</summary>
         public float ComboMultAdd { get; }
 
         /// <summary>특수배율 곱(1 시작, SpecialMultTimes 누적곱).</summary>
@@ -60,7 +63,7 @@ namespace SlotRogue.Relics.Pool
         /// <summary>최종배율 곱(1 시작, FinalMultTimes 누적곱).</summary>
         public float FinalMult { get; }
 
-        /// <summary>받는 피해 배율 곱(1 시작, 유리 대포 등). P2/방어 처리에서 소비.</summary>
+        /// <summary>받는 피해 배율 곱(1 시작, 유리 대포 등). 적 행동/방어 처리에서 소비.</summary>
         public float IncomingDamageMul { get; }
 
         /// <summary>발동 유물별 기여(표시/집계용).</summary>
@@ -68,6 +71,9 @@ namespace SlotRogue.Relics.Pool
 
         /// <summary>이번 턴 적(또는 자신)에게 부여할 상태이상 요청. 상위 레이어가 전투 파이프라인에 전달한다.</summary>
         public IReadOnlyList<RelicSpecStatusRequest> StatusRequests { get; }
+
+        /// <summary>Retrigger 계열 유물/제안이 요청한 족보 반복 연출. [다시] 표식 반복은 별도 경로에서 처리한다.</summary>
+        public IReadOnlyList<RelicPatternRepeat> RetriggerPatternRepeats { get; }
     }
 
     /// <summary>엔진이 요청하는 상태이상 하나. 종류는 <see cref="RelicEffectKind"/>(ApplyBurn 등), 양은 스택/지속.</summary>
@@ -98,5 +104,18 @@ namespace SlotRogue.Relics.Pool
         public string RelicName { get; }
         public int FlatDamage { get; }
         public int Heal { get; }
+    }
+
+    /// <summary>연출 레이어에 전달할 "족보 한 번 더" 반복 요청.</summary>
+    public readonly struct RelicPatternRepeat
+    {
+        public RelicPatternRepeat(int patternIndex, int count)
+        {
+            PatternIndex = patternIndex < 0 ? -1 : patternIndex;
+            Count = count < 0 ? 0 : count;
+        }
+
+        public int PatternIndex { get; }
+        public int Count { get; }
     }
 }

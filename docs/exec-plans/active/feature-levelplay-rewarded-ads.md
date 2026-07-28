@@ -7,7 +7,7 @@
 
 ## Goal
 
-LevelPlay Rewarded 광고를 BootScene 영속 Manager로 초기화하고, 게임오버 부활과 보상 리롤을 광고 reward callback 뒤에만 한 번씩 실행한다.
+LevelPlay Rewarded 광고를 BootScene 영속 Manager로 초기화하고, 게임오버 부활·보상 기능·전투 상점 별조각을 광고 reward callback 뒤에만 실행한다.
 
 ## Checklist
 
@@ -28,6 +28,7 @@ LevelPlay Rewarded 광고를 BootScene 영속 Manager로 초기화하고, 게임
 - [x] RunGame 씬의 리롤 버튼 null override 제거 및 광고 상태 문구/회귀 테스트 추가
 - [x] 부활 시 현재 몬스터 상태를 보존하고 플레이어만 최대 HP의 절반으로 복구
 - [x] 실광고 키 사용을 명시 플래그로 잠그고 Development Build에서는 debug/test ID만 허용
+- [x] 전투 상점 `Ad Button`을 `shop_star_fragment` placement와 wave당 2회 별조각 지급에 연결
 - [ ] Unity Test Runner와 Android 실기기 로그 검증
 
 ## Notes
@@ -43,6 +44,7 @@ LevelPlay Rewarded 광고를 BootScene 영속 Manager로 초기화하고, 게임
 - 2026-06-14: 부활 시 기존 `BattleSystem`을 재개해 몬스터 상태와 다음 행동을 보존한다. `dotnet build SlotRogue.slnx`는 경고 0개, 오류 0개로 통과했다.
 - 2026-06-19: 심볼별 결과 통계를 기본 공격력과 유물 공격력 분리 표시까지 확장한 뒤 `dotnet build SlotRogue.slnx --no-restore`는 경고 0개, 오류 0개로 통과했다. `dotnet test SlotRogue.slnx --no-build`는 종료 코드 0이지만 Unity Test Runner 테스트 개수 출력은 없어 수동 검증은 남아 있다.
 - 2026-07-07: 테스트 APK에서 실광고가 노출되는 것을 막기 위해 `AdsManager`가 실제 광고 키 사용을 `Production Ads Enabled` 플래그 뒤로 잠그도록 변경했다. `Debug.isDebugBuild`에서는 기본적으로 debug/test App Key와 Rewarded Ad Unit ID만 사용하며, 테스트 ID가 비어 있으면 SDK 초기화를 중단한다. Development Build에서 실제 키를 쓰려면 `Production Ads Enabled`와 `Allow Live Ads In Debug Builds`를 둘 다 의도적으로 켜야 한다. `00_TitleScene`의 실제 키 직렬화 값은 비웠다.
+- 2026-07-09: `RunBattleShopView`의 `Ad Button`과 `Ad Text`를 연결했다. wave 시작 시 `2/2`, 보상마다 `1/2`, `0/2`로 갱신하고 두 번째 지급 뒤 버튼을 비활성화한다. 광고 실패·무보상 종료는 횟수를 소비하지 않으며 `remove_ads` 구매자는 같은 제한에서 즉시 지급한다.
 
 ## Completion
 

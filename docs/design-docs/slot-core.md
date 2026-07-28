@@ -1,7 +1,7 @@
 # 슬롯 코어 (Slot Core)
 
 **Status**: draft  
-**Last updated**: 2026-07-01
+**Last updated**: 2026-07-15
 
 ## Purpose
 
@@ -22,6 +22,7 @@ _(ADR 없음 — MVP 초안. 슬롯 RNG / 페이아웃 모델이 확정되면 AD
 | S7 | **NoMatch는 공격 없음** | 족보가 없으면 피해와 공격 횟수를 만들지 않는다. |
 | S8 | **심볼별 기본 공격력** | 족보 피해는 `심볼 기본 공격력 × 매칭 칸 수 × 족보 배율`로 계산한다. 기본값은 체리 2, 레몬 2, 클로버 3, 종 4, 다이아 5, 7은 7이다. |
 | S9 | **스핀 결과와 전투 요청 확정 분리** | `Spin()`과 스왑은 보드만 갱신하고, `ResolveCurrentSpinResult()` 호출 시점에 패턴/피해/`SlotCombatRequest`를 확정한다. RunGame 스왑 대기 중에는 preview만 표시한다. |
+| S10 | **심볼 가중치는 float 누적값** | 기본 가중치는 체리 1.3, 레몬 1.3, 종 1.0, 클로버 1.0, 다이아 0.8, 7 0.5다. 최종 확률은 항상 `symbolWeight / totalWeight`로 계산한다. |
 
 ## Flow
 
@@ -56,7 +57,9 @@ sequenceDiagram
 
 `SlotMachineModel.Spin()`과 `TrySwapAdjacentSymbols()` 직후에는 `CurrentSpinResult`만 최신 보드를 보관하고, `CurrentPatternMatches`, `CurrentCalculationResult`, `CurrentCombatRequest`는 빈 상태를 유지한다. `ResolveCurrentSpinResult()`를 호출하면 현재 보드 기준으로 한 번 패턴을 판정하고 계산 결과를 채운다. RunGame 전투 화면은 스왑 대기 중 `PreviewCurrentPatternMatches()`로 매칭 셀 cue만 표시하고, `ATTACK` 입력 뒤 resolve 결과를 유물/전투 요청에 사용한다.
 
-런 중 슬롯 심볼 확률은 `SlotSymbolPool`이 보관하는 심볼별 한 칸 출현 확률 가중치다. 각 슬롯 칸은 `해당 심볼 가중치 / 전체 가중치`로 독립 추첨하며, RunGame Inspector의 `Initial Symbol Probability Weights` 값으로 시작 가중치를 지정한다. 6개 값을 합계 100으로 맞추면 HUD의 초기 표시가 그대로 퍼센트가 되고, 합계가 100이 아니어도 런타임은 자동으로 정규화한다.
+런 중 슬롯 심볼 확률은 `SlotSymbolPool`이 보관하는 심볼별 한 칸 출현 가중치다. 각 슬롯 칸은 `해당 심볼 가중치 / 전체 가중치`로 독립 추첨하며, RunGame Inspector의 `Initial Symbol Weights` 값으로 시작 가중치를 지정한다. 기본 가중치는 체리 1.3, 레몬 1.3, 종 1.0, 클로버 1.0, 다이아 0.8, 7 0.5다. 확률값은 저장하거나 직접 증감하지 않고 현재 가중치 합으로 매번 정규화한다.
+
+심볼 가중치 증가 제안은 정수 1을 더하지 않고 현재 가중치에 항상 `0.8f`를 더한다. 심볼 가중치 감소/절반 제안은 고정값을 빼지 않고 현재 가중치에 `0.5f`를 곱한다. 제안은 획득 순서대로 누적되므로 7 기본 0.5 기준 `절반 → 증가`는 1.05, `증가 → 절반`은 0.65가 된다.
 
 전투 시스템은 재설계 중이다. `AttackCount`, `HealAmount`, `IsCritical`, `PatternName`은 `SlotCombatRequest`에 보존하고, Battle 계약은 새 design-doc에서 정의한다.
 

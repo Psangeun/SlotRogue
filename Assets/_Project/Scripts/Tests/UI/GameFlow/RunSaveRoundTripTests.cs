@@ -21,7 +21,9 @@ namespace SlotRogue.UI.Tests.GameFlow
         {
             GameFlowSession.AdvanceToNextBattle();
             GameFlowSession.ApplyReward(RunRewardType.MaxHpUp);
-            GameFlowSession.ApplySymbolReward(SlotSymbolType.Seven, 3);
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
             GameFlowSession.ApplySymbolBaseDamageReward(
                 new[] { SlotSymbolType.Seven },
                 5,
@@ -29,7 +31,8 @@ namespace SlotRogue.UI.Tests.GameFlow
             GameFlowSession.AddSpinCoins();
             GameFlowSession.AddSpinCoins();
             GameFlowSession.TryIncreaseRelicSlotCapacity(1);
-            GameFlowSession.AddRelic(RelicCatalog.GetById("R-02"));
+            GameFlowSession.AddRelic(RelicCatalog.GetById("R-04"));
+            GameFlowSession.AddProposalSpec(RelicSpecCatalog.GetProposalById("P-42"));
 
             int battle = GameFlowSession.CurrentBattleNumber;
             int maxHp = GameFlowSession.PlayerMaxHp;
@@ -37,7 +40,8 @@ namespace SlotRogue.UI.Tests.GameFlow
             int runCoins = GameFlowSession.RunCoins;
             int relicSlotCapacity = GameFlowSession.RelicSlotCapacity;
             int relicCount = GameFlowSession.OwnedRelics.Count;
-            int sevenWeight = GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven);
+            int proposalCount = GameFlowSession.ProposalSpecs.Count;
+            float sevenWeight = GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven);
             int sevenDamage = SlotSymbolAttackValues.DamageFor(SlotSymbolType.Seven);
 
             RunSaveData saved = GameFlowSession.CaptureSave();
@@ -56,10 +60,66 @@ namespace SlotRogue.UI.Tests.GameFlow
             Assert.That(GameFlowSession.RunCoins, Is.EqualTo(runCoins));
             Assert.That(GameFlowSession.RelicSlotCapacity, Is.EqualTo(relicSlotCapacity));
             Assert.That(GameFlowSession.OwnedRelics.Count, Is.EqualTo(relicCount));
+            Assert.That(GameFlowSession.ProposalSpecs.Count, Is.EqualTo(proposalCount));
+            Assert.That(GameFlowSession.HasAcquiredProposal("P-42"), Is.True);
             Assert.That(GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven),
-                Is.EqualTo(sevenWeight));
+                Is.EqualTo(sevenWeight).Within(0.0001f));
             Assert.That(SlotSymbolAttackValues.DamageFor(SlotSymbolType.Seven),
                 Is.EqualTo(sevenDamage));
+        }
+
+        [Test]
+        public void SymbolWeightProposalOrder_ChangesFinalWeight()
+        {
+            GameFlowSession.ApplySymbolWeightHalfReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+
+            float halveThenIncrease =
+                GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven);
+
+            GameFlowSession.StartNewRun();
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+            GameFlowSession.ApplySymbolWeightHalfReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+
+            float increaseThenHalve =
+                GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven);
+
+            Assert.That(halveThenIncrease, Is.EqualTo(0.55f).Within(0.0001f));
+            Assert.That(increaseThenHalve, Is.EqualTo(0.4f).Within(0.0001f));
+        }
+
+        [Test]
+        public void CaptureThenRestore_PreservesOrderedSymbolWeightResult()
+        {
+            GameFlowSession.ApplySymbolWeightHalfReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+            RunSaveData saved = GameFlowSession.CaptureSave();
+
+            GameFlowSession.StartNewRun();
+
+            Assert.That(GameFlowSession.RestoreFromSave(saved), Is.True);
+            Assert.That(
+                GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven),
+                Is.EqualTo(0.55f).Within(0.0001f));
+
+            GameFlowSession.ApplySymbolWeightIncreaseReward(
+                new[] { SlotSymbolType.Seven },
+                countRewardClaim: false);
+            Assert.That(
+                GameFlowSession.SlotPool.GetWeight(SlotSymbolType.Seven),
+                Is.EqualTo(0.85f).Within(0.0001f));
         }
 
         [Test]
@@ -87,7 +147,7 @@ namespace SlotRogue.UI.Tests.GameFlow
         [Test]
         public void TryAddRelic_StopsAtDefaultRelicSlotCapacity()
         {
-            string[] relicIds = { "R-02", "R-03", "R-04", "R-05", "R-06", "R-07" };
+            string[] relicIds = { "R-01", "R-04", "R-05", "R-06", "R-09", "R-10" };
 
             for (int index = 0; index < GameFlowSession.DefaultRelicSlotCapacity; index++)
             {
@@ -130,14 +190,14 @@ namespace SlotRogue.UI.Tests.GameFlow
             saved.relicSlotCapacity = 99;
             saved.relicIds = new[]
             {
-                "R-02",
-                "R-03",
+                "R-01",
                 "R-04",
                 "R-05",
                 "R-06",
-                "R-07",
-                "R-08",
                 "R-09",
+                "R-10",
+                "R-11",
+                "R-12",
             };
 
             bool restored = GameFlowSession.RestoreFromSave(saved);

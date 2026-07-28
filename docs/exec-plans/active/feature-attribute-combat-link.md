@@ -80,6 +80,10 @@
 
 ## Implementation notes
 
+- 2026-07-09: `PlayerStatusPanelView`를 일반 C# view 객체에서 `Player Stat Panel`에 직접 붙는 `MonoBehaviour` 컴포넌트로 전환했다. `RunBattleScreenView`는 이제 패널 root와 icon set을 따로 들지 않고 해당 컴포넌트를 직렬화 참조한다.
+- 2026-07-10: 플레이어 상태 패널은 아이콘 대신 TMP 텍스트 라벨을 표시하고, `ingame_statback`의 파란 sprite를 버프 배경, 빨간 sprite를 디버프 배경으로 사용한다.
+- 2026-07-10: RunGame 상태효과 debug UI와 `DevButtonAttribute` prefab은 Unity `EditorOnly` 태그로 표시해 에디터 hierarchy에는 남기고 APK 빌드에서는 제외한다.
+
 - 취약/약화의 핵심 위험은 “유물 발동 건별 소모”다. v6 기준 정산 1회는 플레이어 스핀 1회의 합산 피해, 몬스터 공격 행동 1회다.
 - 현재 `CombatEffect[]`는 개별 효과 순서로 적용되므로, 취약/약화를 단순히 `Damage` effect마다 소모하면 기획과 달라질 수 있다. 정산 묶음 또는 action 단위 context가 필요하다.
 - 감염은 총 스택 상한이 없다. 기존 독 전용 5스택 제한 코드는 제거한다.

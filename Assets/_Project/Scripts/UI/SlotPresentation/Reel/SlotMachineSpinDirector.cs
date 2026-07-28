@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using SlotRogue.Slot.Data;
 using UnityEngine;
 using UnityEngine.UI;
@@ -115,12 +116,54 @@ namespace SlotRogue.UI.SlotPresentation.Reel
             return true;
         }
 
+        /// <summary>
+        /// 정착된 보드의 각 셀에 "다시" 표식을 반영한다. marks는 5x3 셀 인덱스 기준 bool 배열.
+        /// 릴 심볼 아이템은 스핀 중 재활용되므로, 릴이 멈춘(정착) 뒤에 호출해야 창에 올바로 붙는다.
+        /// </summary>
+        public void ShowAgainMarks(IReadOnlyList<bool> marks)
+        {
+            if (!HasAuthoredReels())
+            {
+                return;
+            }
+
+            for (int column = 0; column < Columns; column++)
+            {
+                for (int row = 0; row < VisibleRows; row++)
+                {
+                    int index = SlotSpinResult.ToIndex(column, row);
+                    bool on = marks != null && index < marks.Count && marks[index];
+                    _reels[column].SetAgainMark(row, on);
+                }
+            }
+        }
+
+        /// <summary>모든 릴에서 "다시" 표식을 끈다(새 스핀 시작·화면 정리 시).</summary>
+        public void ClearAgainMarks()
+        {
+            if (_reels == null)
+            {
+                return;
+            }
+
+            for (int column = 0; column < Columns && column < _reels.Length; column++)
+            {
+                if (_reels[column] != null)
+                {
+                    _reels[column].ClearAgainMarks();
+                }
+            }
+        }
+
         public IEnumerator Play(SlotSpinResult result, Func<bool> shouldSkip)
         {
             if (result == null || !EnsureReels())
             {
                 yield break;
             }
+
+            // 이전 스핀의 "다시" 표식이 남아 새 심볼 위에 겹치지 않도록 정리한다.
+            ClearAgainMarks();
 
             // Hide the underlying cell icons so only the reels animate (the reel symbol sprites are
             // transparent, otherwise static cells would show through and look like a second slot).
@@ -182,6 +225,8 @@ namespace SlotRogue.UI.SlotPresentation.Reel
             }
 
             StopImmediate(result);
+            // 즉시 표시(초기 보드·스왑 정착)에서는 이전/저작된 [다시] 배지를 끈다. 필요 시 상위가 다시 켠다.
+            ClearAgainMarks();
 
             if (ReelsAreDisplay)
             {

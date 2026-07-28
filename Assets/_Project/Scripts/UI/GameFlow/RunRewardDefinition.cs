@@ -20,8 +20,8 @@ namespace SlotRogue.UI.GameFlow
     public enum RunRewardKind
     {
         Stat = 0,    // 영구 스탯/효과 (RunRewardType)
-        Symbol = 1,  // 심볼별 한 칸 출현 확률값 변경
-        Relic = 2,   // v23 유물 획득
+        Symbol = 1,  // 심볼별 한 칸 출현 가중치 변경
+        Relic = 2,   // v30 유물 획득
         Proposal = 3,
     }
 
@@ -29,7 +29,7 @@ namespace SlotRogue.UI.GameFlow
     {
         private readonly SlotSymbolType[] _symbols;
 
-        /// <summary>v23 유물 보상.</summary>
+        /// <summary>v30 유물 보상.</summary>
         public RunRewardDefinition(RelicDefinition relic)
         {
             Kind = RunRewardKind.Relic;
@@ -53,7 +53,7 @@ namespace SlotRogue.UI.GameFlow
             _symbols = Array.Empty<SlotSymbolType>();
         }
 
-        /// <summary>심볼별 한 칸 출현 확률값 증가/감소 보상.</summary>
+        /// <summary>심볼별 한 칸 출현 가중치 증가/감소 보상.</summary>
         public RunRewardDefinition(SlotSymbolType symbol, int amount, string displayName, string description)
         {
             Kind = RunRewardKind.Symbol;

@@ -11,6 +11,7 @@ namespace SlotRogue.UI.Ads
         private const string RewardRerollPlacement = "reward_reroll";
         private const string ExtraRewardPlacement = "reward_extra";
         private const string RewardDoublePlacement = "reward_double";
+        private const string ShopStarFragmentPlacement = "shop_star_fragment";
         private const float ReloadDelaySeconds = 2f;
 
         [SerializeField] private string appKey;
@@ -392,6 +393,7 @@ namespace SlotRogue.UI.Ads
                 RewardedAdPurpose.RewardReroll => RewardRerollPlacement,
                 RewardedAdPurpose.ExtraReward => ExtraRewardPlacement,
                 RewardedAdPurpose.RewardDouble => RewardDoublePlacement,
+                RewardedAdPurpose.ShopStarFragment => ShopStarFragmentPlacement,
                 _ => string.Empty,
             };
         }

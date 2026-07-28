@@ -22,6 +22,7 @@ namespace SlotRogue.Editor.GameFlow
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField("Required References", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_playerHudView"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_playerStatusPanelView"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_slotBoardView"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_actionView"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_shopView"));
@@ -52,6 +53,7 @@ namespace SlotRogue.Editor.GameFlow
         private void DrawBindingSummary()
         {
             DrawObjectStatus("Player HUD view", serializedObject.FindProperty("_playerHudView"));
+            DrawObjectStatus("Player status panel", serializedObject.FindProperty("_playerStatusPanelView"));
             DrawObjectStatus("Slot board view", serializedObject.FindProperty("_slotBoardView"));
             DrawObjectStatus("Action view", serializedObject.FindProperty("_actionView"));
             DrawObjectStatus("Shop view", serializedObject.FindProperty("_shopView"));

@@ -52,6 +52,7 @@ namespace SlotRogue.UI.GameFlow
         private Sprite[] _loadedSlotSymbolSprites;
         private Sprite[] _loadedSlotSpinSymbolSprites;
         private Sprite[] _loadedSlotHighlightSymbolSprites;
+        private RunEncounterRoster _currentEncounterRoster;
         private bool _hasSlotPatternCatalogHandle;
         private bool _tutorialSpinBlocked;
         private bool _tutorialTargetSelectionBlocked;
@@ -88,6 +89,7 @@ namespace SlotRogue.UI.GameFlow
             CancelBattleStart();
             CancelPresentation();
             DisposeBattleFlow();
+            _currentEncounterRoster = null;
 
             _battleStartCts = new CancellationTokenSource();
             BeginBattleAsync(_battleStartCts.Token).Forget();
@@ -120,6 +122,14 @@ namespace SlotRogue.UI.GameFlow
         public void FinalizePendingDefeat()
         {
             _resultRecorder.FinalizePendingDefeat();
+        }
+
+        public void DevApplyRelicStatusTurn(
+            StatusEffectKind statusEffectKind,
+            int amount,
+            CombatTargetMode targetMode)
+        {
+            _battleFlowController?.DevApplyRelicStatusTurn(statusEffectKind, amount, targetMode);
         }
 
         public void SetTutorialSpinBlocked(bool blocked)
@@ -266,6 +276,7 @@ namespace SlotRogue.UI.GameFlow
                 GameFlowSession.PlayerMaxHp,
                 GameFlowSession.PlayerCurrentHp);
             RunEncounterRoster encounterRoster = CreateEncounterRoster();
+            _currentEncounterRoster = encounterRoster;
 
             return new BattleFlowContext(
                 player,
@@ -501,7 +512,7 @@ namespace SlotRogue.UI.GameFlow
 
         private void HandleBattleCompleted(BattleFlowResult result)
         {
-            _resultRecorder.Record(result);
+            _resultRecorder.Record(result, _currentEncounterRoster);
 
             if (result.EndReason == BattleEndReason.Victory)
             {

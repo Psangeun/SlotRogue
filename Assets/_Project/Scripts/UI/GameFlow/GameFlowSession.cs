@@ -31,7 +31,7 @@ namespace SlotRogue.UI.GameFlow
         // 등급은 CurrentBattleNumber로부터 생성합니다.
 
         private static readonly WaveSchedule DefaultWaveSchedule = WaveSchedule.CreateDefault();
-        private static readonly Dictionary<SlotSymbolType, int> InitialSymbolWeights =
+        private static readonly Dictionary<SlotSymbolType, float> InitialSymbolWeights =
             BuildDefaultInitialSymbolWeights();
         private static readonly Dictionary<SlotSymbolType, int> InitialSymbolBaseDamage =
             BuildDefaultInitialSymbolBaseDamage();
@@ -52,7 +52,7 @@ namespace SlotRogue.UI.GameFlow
         public static int RunSeed { get; private set; }
 
         /// <summary>
-        /// 런 동안 유지되는 심볼별 한 칸 출현 확률값 테이블.
+        /// 런 동안 유지되는 심볼별 한 칸 출현 가중치 테이블.
         /// 인스턴스는 불변(식별자 유지)이며 새 런 시작 시 가중치만 Reset합니다.
         /// </summary>
         public static SlotSymbolPool SlotPool { get; } = new SlotSymbolPool();
@@ -134,9 +134,12 @@ namespace SlotRogue.UI.GameFlow
             BaseSwapCountPerPlayerTurn +
             RelicSpecRunner.ResolveRuleModifier(BuildOwnedSpecs(), RelicEffectKind.SwapCountDelta);
 
-        /// <summary>보유한 상점 할인 유물(R-27/R-28 등)이 주는 유물 가격 할인 합.</summary>
+        /// <summary>보유한 상점 가격 보정 유물(R-28/R-72 등)이 주는 유물 가격 할인 합.</summary>
         public static int ShopDiscount =>
             RelicSpecRunner.ResolveRuleModifier(BuildOwnedSpecs(), RelicEffectKind.ShopDiscount);
+
+        public static float IncomingDamageMultiplier =>
+            RelicSpecRunner.ResolveIncomingDamageMultiplier(BuildOwnedSpecs());
 
         public static int AddSpinCoins()
         {
@@ -176,14 +179,15 @@ namespace SlotRogue.UI.GameFlow
             RunCoinsChanged?.Invoke(RunCoins);
         }
 
-        // ── v23 유물 인벤토리 ────────────────────────────────────────────
+        // ── v30 유물 인벤토리 ────────────────────────────────────────────
         // 시작 유물 + 보상으로 획득한 유물을 누적한다. 전투마다 RelicTurnResolver가 소비한다.
         // 보유 로직은 인스턴스 클래스 RelicInventory에 위임한다(책임 분리 + 테스트 가능).
         private static readonly RelicInventory _inventory = new();
         private static readonly RelicContributionAccumulator _relicContributions = new();
         private static readonly SlotSymbolContributionAccumulator _slotSymbolContributions = new();
+        private static readonly List<string> _acquiredProposalIds = new();
 
-        /// <summary>이 런에서 보유한 v23 유물 목록(시작 유물 포함).</summary>
+        /// <summary>이 런에서 보유한 v30 유물 목록.</summary>
         public static IReadOnlyList<RelicDefinition> OwnedRelics => _inventory.Owned;
 
         public static bool HasStarterRelic => _inventory.HasStarter;
@@ -240,16 +244,50 @@ namespace SlotRogue.UI.GameFlow
         /// <summary>제안(처치 보상)으로 획득한 영구 엔진 효과 스펙. 유물과 함께 전투 엔진이 소비한다.</summary>
         public static IReadOnlyList<RelicSpec> ProposalSpecs => _proposalSpecs;
 
+        public static bool HasAcquiredProposal(string proposalId)
+        {
+            if (string.IsNullOrEmpty(proposalId))
+            {
+                return false;
+            }
+
+            for (int index = 0; index < _acquiredProposalIds.Count; index++)
+            {
+                if (string.Equals(_acquiredProposalIds[index], proposalId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>엔진 효과 제안을 픽했을 때 스펙을 이 런 동안 영구 누적한다.</summary>
         public static void AddProposalSpec(RelicSpec spec)
         {
             if (spec != null)
             {
+                if (RunRewardCatalog.IsOneTimeProposal(spec.Id) && HasAcquiredProposal(spec.Id))
+                {
+                    return;
+                }
+
                 _proposalSpecs.Add(spec);
+                MarkProposalAcquired(spec.Id);
             }
         }
 
-        /// <summary>보유 유물을 v29 명세(<see cref="RelicSpec"/>) 목록으로 변환한다(엔진 입력용).</summary>
+        private static void MarkProposalAcquired(string proposalId)
+        {
+            if (string.IsNullOrEmpty(proposalId) || HasAcquiredProposal(proposalId))
+            {
+                return;
+            }
+
+            _acquiredProposalIds.Add(proposalId);
+        }
+
+        /// <summary>보유 유물을 v30 명세(<see cref="RelicSpec"/>) 목록으로 변환한다(엔진 입력용).</summary>
         private static IReadOnlyList<RelicSpec> BuildOwnedSpecs()
         {
             IReadOnlyList<RelicDefinition> owned = _inventory.Owned;
@@ -316,12 +354,12 @@ namespace SlotRogue.UI.GameFlow
         }
 
         public static void ConfigureInitialSymbolWeights(
-            int cherry,
-            int lemon,
-            int clover,
-            int bell,
-            int diamond,
-            int seven)
+            float cherry,
+            float lemon,
+            float clover,
+            float bell,
+            float diamond,
+            float seven)
         {
             SetInitialSymbolWeight(SlotSymbolType.Cherry, cherry);
             SetInitialSymbolWeight(SlotSymbolType.Lemon, lemon);
@@ -419,6 +457,7 @@ namespace SlotRogue.UI.GameFlow
             _restoredFromSave = false;
             _inventory.Clear();
             _proposalSpecs.Clear();
+            _acquiredProposalIds.Clear();
             _relicContributions.Clear();
             _slotSymbolContributions.Clear();
             ApplyConfiguredInitialSymbolWeights();
@@ -489,12 +528,14 @@ namespace SlotRogue.UI.GameFlow
         {
             IReadOnlyList<SlotSymbolType> symbols = SlotSymbolPool.Symbols;
             var symbolTypes = new int[symbols.Count];
+            var symbolWeights = new float[symbols.Count];
             var symbolCounts = new int[symbols.Count];
             var symbolBaseDamageBonuses = new int[symbols.Count];
             for (int index = 0; index < symbols.Count; index++)
             {
                 symbolTypes[index] = (int)symbols[index];
-                symbolCounts[index] = SlotPool.GetWeight(symbols[index]);
+                symbolWeights[index] = SlotPool.GetWeight(symbols[index]);
+                symbolCounts[index] = ToLegacyScaledWeight(symbolWeights[index]);
                 symbolBaseDamageBonuses[index] =
                     GetSymbolBaseDamageBonus(symbols[index]);
             }
@@ -504,6 +545,12 @@ namespace SlotRogue.UI.GameFlow
             for (int index = 0; index < relics.Count; index++)
             {
                 relicIds[index] = relics[index].Id;
+            }
+
+            var proposalIds = new string[_proposalSpecs.Count];
+            for (int index = 0; index < _proposalSpecs.Count; index++)
+            {
+                proposalIds[index] = _proposalSpecs[index].Id;
             }
 
             return new RunSaveData
@@ -524,7 +571,9 @@ namespace SlotRogue.UI.GameFlow
                 relicSlotCapacity = RelicSlotCapacity,
                 hasRevivedThisRun = HasRevivedThisRun,
                 relicIds = relicIds,
+                proposalIds = proposalIds,
                 symbolTypes = symbolTypes,
+                symbolWeights = symbolWeights,
                 symbolBaseDamageBonuses = symbolBaseDamageBonuses,
                 symbolCounts = symbolCounts,
             };
@@ -579,6 +628,16 @@ namespace SlotRogue.UI.GameFlow
                 }
             }
 
+            _proposalSpecs.Clear();
+            _acquiredProposalIds.Clear();
+            if (data.proposalIds != null)
+            {
+                for (int index = 0; index < data.proposalIds.Length; index++)
+                {
+                    AddProposalSpec(RelicSpecCatalog.GetProposalById(data.proposalIds[index]));
+                }
+            }
+
             _relicContributions.Clear();
             _slotSymbolContributions.Clear();
             ResetSymbolBaseDamageBonuses();
@@ -589,6 +648,17 @@ namespace SlotRogue.UI.GameFlow
 
             SlotPool.Reset();
             if (data.symbolTypes != null &&
+                data.symbolWeights != null &&
+                data.symbolTypes.Length == data.symbolWeights.Length)
+            {
+                for (int index = 0; index < data.symbolTypes.Length; index++)
+                {
+                    SlotPool.SetWeight(
+                        (SlotSymbolType)data.symbolTypes[index],
+                        data.symbolWeights[index]);
+                }
+            }
+            else if (data.symbolTypes != null &&
                 data.symbolCounts != null &&
                 data.symbolTypes.Length == data.symbolCounts.Length)
             {
@@ -596,16 +666,16 @@ namespace SlotRogue.UI.GameFlow
                 {
                     SlotPool.SetWeight(
                         (SlotSymbolType)data.symbolTypes[index],
-                        data.symbolCounts[index]);
+                        FromLegacyScaledWeight(data.symbolCounts[index]));
                 }
             }
 
             return true;
         }
 
-        private static Dictionary<SlotSymbolType, int> BuildDefaultInitialSymbolWeights()
+        private static Dictionary<SlotSymbolType, float> BuildDefaultInitialSymbolWeights()
         {
-            var weights = new Dictionary<SlotSymbolType, int>();
+            var weights = new Dictionary<SlotSymbolType, float>();
             IReadOnlyList<SlotSymbolType> symbols = SlotSymbolPool.Symbols;
             for (int index = 0; index < symbols.Count; index++)
             {
@@ -641,9 +711,9 @@ namespace SlotRogue.UI.GameFlow
             return values;
         }
 
-        private static void SetInitialSymbolWeight(SlotSymbolType symbol, int weight)
+        private static void SetInitialSymbolWeight(SlotSymbolType symbol, float weight)
         {
-            InitialSymbolWeights[symbol] = Math.Max(0, weight);
+            InitialSymbolWeights[symbol] = Math.Max(0f, weight);
         }
 
         private static void SetInitialSymbolBaseDamage(SlotSymbolType symbol, int value)
@@ -658,7 +728,7 @@ namespace SlotRogue.UI.GameFlow
             for (int index = 0; index < symbols.Count; index++)
             {
                 SlotSymbolType symbol = symbols[index];
-                int weight = InitialSymbolWeights.TryGetValue(symbol, out int configured)
+                float weight = InitialSymbolWeights.TryGetValue(symbol, out float configured)
                     ? configured
                     : SlotSymbolPool.DefaultWeightFor(symbol);
                 SlotPool.SetWeight(symbol, weight);
@@ -751,6 +821,16 @@ namespace SlotRogue.UI.GameFlow
             _ => 0,
         };
 
+        private static int ToLegacyScaledWeight(float weight)
+        {
+            return (int)Math.Round(Math.Max(0f, weight) * 10f, MidpointRounding.AwayFromZero);
+        }
+
+        private static float FromLegacyScaledWeight(int weight)
+        {
+            return Math.Max(0, weight) / 10f;
+        }
+
         private static bool CanApplyInitialSymbolWeightConfigurationToCurrentRun()
         {
             return HasRun &&
@@ -786,13 +866,13 @@ namespace SlotRogue.UI.GameFlow
             RewardsClaimed++;
         }
 
-        /// <summary>심볼별 한 칸 출현 확률값을 변경하는 보상을 적용합니다.</summary>
-        public static void ApplySymbolReward(SlotSymbolType symbol, int amount)
+        /// <summary>심볼별 한 칸 출현 가중치를 직접 변경하는 레거시 보상을 적용합니다.</summary>
+        public static void ApplySymbolReward(SlotSymbolType symbol, float amount)
         {
             ApplySymbolWeightReward(symbol, amount);
         }
 
-        public static void ApplySymbolWeightReward(SlotSymbolType symbol, int amount)
+        public static void ApplySymbolWeightReward(SlotSymbolType symbol, float amount)
         {
             EnsureRunStarted();
             SlotPool.AddWeight(symbol, amount);
@@ -801,7 +881,7 @@ namespace SlotRogue.UI.GameFlow
 
         public static void ApplySymbolWeightReward(
             IReadOnlyList<SlotSymbolType> symbols,
-            int amount,
+            float amount,
             bool countRewardClaim = true)
         {
             EnsureRunStarted();
@@ -810,6 +890,54 @@ namespace SlotRogue.UI.GameFlow
                 for (int index = 0; index < symbols.Count; index++)
                 {
                     SlotPool.AddWeight(symbols[index], amount);
+                }
+            }
+
+            if (countRewardClaim)
+            {
+                RewardsClaimed++;
+            }
+        }
+
+        /// <summary>심볼 가중치 증가 제안 기본 1회분을 획득 순서대로 적용합니다.</summary>
+        public static void ApplySymbolWeightIncreaseReward(
+            IReadOnlyList<SlotSymbolType> symbols,
+            bool countRewardClaim = true)
+        {
+            ApplySymbolWeightIncreaseReward(symbols, SlotSymbolPool.ProposalWeightIncrease, countRewardClaim);
+        }
+
+        public static void ApplySymbolWeightIncreaseReward(
+            IReadOnlyList<SlotSymbolType> symbols,
+            float amount,
+            bool countRewardClaim = true)
+        {
+            EnsureRunStarted();
+            if (symbols != null)
+            {
+                for (int index = 0; index < symbols.Count; index++)
+                {
+                    SlotPool.AddWeight(symbols[index], amount);
+                }
+            }
+
+            if (countRewardClaim)
+            {
+                RewardsClaimed++;
+            }
+        }
+
+        /// <summary>심볼 가중치 절반 제안을 획득 순서대로 적용합니다.</summary>
+        public static void ApplySymbolWeightHalfReward(
+            IReadOnlyList<SlotSymbolType> symbols,
+            bool countRewardClaim = true)
+        {
+            EnsureRunStarted();
+            if (symbols != null)
+            {
+                for (int index = 0; index < symbols.Count; index++)
+                {
+                    SlotPool.HalveWeight(symbols[index]);
                 }
             }
 

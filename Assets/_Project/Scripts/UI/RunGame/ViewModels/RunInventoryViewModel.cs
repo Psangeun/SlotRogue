@@ -117,7 +117,7 @@ namespace SlotRogue.UI.RunGame.ViewModels
         private static string BuildSummary()
         {
             return
-                $"확률 합계 {GameFlowSession.SlotPool.TotalWeight}% · " +
+                $"가중치 합계 {FormatWeight(GameFlowSession.SlotPool.TotalWeight)} · " +
                 $"유물 {GameFlowSession.OwnedRelics.Count}개";
         }
 
@@ -144,13 +144,18 @@ namespace SlotRogue.UI.RunGame.ViewModels
             SlotSymbolPool pool,
             SlotSymbolType symbol)
         {
-            if (pool == null || pool.TotalWeight <= 0)
+            if (pool == null || pool.TotalWeight <= 0f)
             {
                 return "0%";
             }
 
             double percent = pool.GetWeight(symbol) * 100d / pool.TotalWeight;
             return percent.ToString("0.#", CultureInfo.InvariantCulture) + "%";
+        }
+
+        private static string FormatWeight(float weight)
+        {
+            return weight.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         private static RunInventoryPatternViewState[] BuildPatternItems()
@@ -377,7 +382,7 @@ namespace SlotRogue.UI.RunGame.ViewModels
             return new RunInventorySymbolViewState(
                 symbol,
                 RelicDisplay.SymbolKorean(symbol),
-                0,
+                0f,
                 "0%",
                 0);
         }
@@ -388,7 +393,7 @@ namespace SlotRogue.UI.RunGame.ViewModels
         public RunInventorySymbolViewState(
             SlotSymbolType symbol,
             string displayName,
-            int weight,
+            float weight,
             string probabilityText)
             : this(
                 symbol,
@@ -402,13 +407,13 @@ namespace SlotRogue.UI.RunGame.ViewModels
         public RunInventorySymbolViewState(
             SlotSymbolType symbol,
             string displayName,
-            int weight,
+            float weight,
             string probabilityText,
             int baseDamage)
         {
             Symbol = symbol;
             DisplayName = displayName ?? string.Empty;
-            Weight = Math.Max(0, weight);
+            Weight = Math.Max(0f, weight);
             ProbabilityText = probabilityText ?? string.Empty;
             BaseDamage = Math.Max(0, baseDamage);
         }
@@ -417,9 +422,9 @@ namespace SlotRogue.UI.RunGame.ViewModels
 
         public string DisplayName { get; }
 
-        public int Weight { get; }
+        public float Weight { get; }
 
-        public int Count => Weight;
+        public float Count => Weight;
 
         public string ProbabilityText { get; }
 

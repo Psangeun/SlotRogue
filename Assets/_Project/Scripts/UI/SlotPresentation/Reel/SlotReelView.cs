@@ -59,6 +59,40 @@ namespace SlotRogue.UI.SlotPresentation.Reel
             return _items[itemIndex].Icon;
         }
 
+        /// <summary>이 릴의 특정 창 행(0=맨 위)에 "다시" 표식 배지를 켜거나 끈다.</summary>
+        public void SetAgainMark(int row, bool on)
+        {
+            int itemIndex = TopBufferCount + row;
+            if (row < 0 ||
+                row >= VisibleRows ||
+                _items == null ||
+                itemIndex < 0 ||
+                itemIndex >= _items.Count ||
+                _items[itemIndex] == null)
+            {
+                return;
+            }
+
+            _items[itemIndex].SetAgainMark(on);
+        }
+
+        /// <summary>이 릴의 모든 심볼 아이템에서 "다시" 표식을 끈다(스핀 시작·리셋 시).</summary>
+        public void ClearAgainMarks()
+        {
+            if (_items == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < _items.Count; index++)
+            {
+                if (_items[index] != null)
+                {
+                    _items[index].SetAgainMark(false);
+                }
+            }
+        }
+
         /// <summary>
         /// Returns a stable, full-width transparent hit target covering one visible row's window.
         /// Unlike <see cref="GetVisibleIcon"/>, whose pooled symbol items are recycled and reordered

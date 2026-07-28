@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using SlotRogue.Slot.Data;
+using SlotRogue.UI.Combat.Presentation;
 using SlotRogue.UI.SlotPresentation;
 using SlotRogue.UI.SlotPresentation.Reel;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
@@ -34,6 +36,28 @@ namespace SlotRogue.UI.GameFlow
         [SerializeField] private SlotMachineSpinDirector _spinDirector;
         [SerializeField] private SlotCellSpinView _slotCellSpinView;
         [SerializeField] private PatternCueMotion _patternCueMotion = PatternCueMotion.TiltPulse;
+        [SerializeField] private TMP_Text _resultTextTemplate;
+        [SerializeField] private TMP_SpriteAsset _resultSpriteAsset;
+        [SerializeField] private int _attackResultSpriteIndex = 1;
+        [SerializeField] private int _statusResultSpriteIndex = 8;
+        [SerializeField] private string _attackResultFallbackLabel = "ATK";
+        [SerializeField] private string _statusResultFallbackLabel = "STATUS";
+        [SerializeField] private string _resultTextSeparator = " + ";
+        [SerializeField] private Vector2 _resultTextSize = new(100f, 32f);
+        [SerializeField] private Vector2 _resultTextOffset = Vector2.zero;
+        [SerializeField] private RectTransform _resultTextParticleRoot;
+        [SerializeField] private float _resultTextAppearDuration = 0.16f;
+        [SerializeField] private float _resultTextAppearStartScale = 0.94f;
+        [SerializeField] private float _resultTextFloatAmplitude = 8f;
+        [SerializeField] private float _resultTextFloatCycleDuration = 0.55f;
+        [SerializeField] private int _resultTextParticleCount = 8;
+        [SerializeField] private Vector2 _resultTextParticleSize = new(14f, 14f);
+        [SerializeField] private float _resultTextParticleHorizontalSpread = 58f;
+        [SerializeField] private float _resultTextParticleRise = 46f;
+        [SerializeField] private float _resultTextParticleFall = 58f;
+        [SerializeField] private float _resultTextParticleDuration = 0.64f;
+        [SerializeField] private float _resultTextParticleStartScale = 0.55f;
+        [SerializeField] private float _resultTextParticleEndScale = 1.05f;
 
         private Color[] _slotCellDefaultColors;
         private Image[] _slotCellVisualIcons;
@@ -59,6 +83,12 @@ namespace SlotRogue.UI.GameFlow
         private readonly List<Sprite> _highlightedVisualAppliedSprites = new();
         private readonly List<bool> _highlightedVisualDefaultEnabled = new();
         private readonly List<Vector2> _highlightedVisualDefaultSizes = new();
+        private readonly List<Image> _resultTextParticlePool = new();
+        private readonly List<Sequence> _resultTextParticleTweens = new();
+        private readonly Vector3[] _resultTextCorners = new Vector3[4];
+        private Sequence _resultTextAppearTween;
+        private Sequence _resultTextFloatTween;
+        private string _resultTextPresentationKey = string.Empty;
         private int[] _activePatternCueIndices = Array.Empty<int>();
         private bool _activePatternCuePending;
 
@@ -71,11 +101,13 @@ namespace SlotRogue.UI.GameFlow
             EnsureSlotCellIconButtons();
             SubscribeSlotCellButtons();
             SubscribeSlotCellIconButtons();
+            HideCurrentPatternResultText();
         }
 
         private void OnDestroy()
         {
             StopPatternCue();
+            HideCurrentPatternResultText();
             UnsubscribeSlotCellButtons();
             UnsubscribeSlotCellIconButtons();
         }
@@ -83,6 +115,7 @@ namespace SlotRogue.UI.GameFlow
         private void OnDisable()
         {
             StopPatternCue();
+            HideCurrentPatternResultText();
         }
 
         public void Bind(Text[] slotCells)
@@ -219,6 +252,612 @@ namespace SlotRogue.UI.GameFlow
             }
 
             UpdatePatternCue(highlightedCellIndices, pendingPatternCue);
+        }
+
+        public void ShowCurrentPatternResultText(RunBattlePatternResultTextState result)
+        {
+            int[] cellIndices = result.CellIndices;
+            if (_resultTextTemplate == null ||
+                !result.HasContent ||
+                !TryCalculatePatternResultWorldPosition(cellIndices, out Vector3 worldPosition))
+            {
+                HideCurrentPatternResultText();
+                return;
+            }
+
+            string text = BuildPatternResultText(result);
+            if (string.IsNullOrEmpty(text))
+            {
+                HideCurrentPatternResultText();
+                return;
+            }
+
+            ConfigureResultText(_resultTextTemplate);
+            string presentationKey = BuildResultTextPresentationKey(cellIndices, text);
+            bool shouldAnimate = !_resultTextTemplate.gameObject.activeSelf ||
+                _resultTextPresentationKey != presentationKey;
+
+            _resultTextTemplate.text = text;
+            _resultTextTemplate.gameObject.SetActive(true);
+            Vector2 baseAnchoredPosition = PositionResultText(_resultTextTemplate, worldPosition);
+
+            if (shouldAnimate)
+            {
+                PlayResultTextHoverTween(_resultTextTemplate, baseAnchoredPosition);
+                PlayResultTextAttackParticleBurst(_resultTextTemplate.rectTransform.position);
+            }
+            else if (!HasActiveResultTextMotionTween())
+            {
+                ShowResultTextAtRest(_resultTextTemplate, baseAnchoredPosition);
+            }
+
+            _resultTextPresentationKey = presentationKey;
+        }
+
+        private void ConfigureResultText(TMP_Text resultText)
+        {
+            if (resultText == null)
+            {
+                return;
+            }
+
+            resultText.raycastTarget = false;
+            if (_resultSpriteAsset != null)
+            {
+                resultText.spriteAsset = _resultSpriteAsset;
+            }
+
+            resultText.textWrappingMode = TextWrappingModes.NoWrap;
+            resultText.alignment = TextAlignmentOptions.Center;
+
+            RectTransform rectTransform = resultText.rectTransform;
+            if (rectTransform == null)
+            {
+                return;
+            }
+
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            if (_resultTextSize.x > 0f && _resultTextSize.y > 0f)
+            {
+                rectTransform.sizeDelta = _resultTextSize;
+            }
+        }
+
+        public void HideCurrentPatternResultText()
+        {
+            KillResultTextMotionTweens();
+            HideResultTextAttackParticles();
+            _resultTextPresentationKey = string.Empty;
+
+            if (_resultTextTemplate == null)
+            {
+                return;
+            }
+
+            _resultTextTemplate.text = string.Empty;
+            _resultTextTemplate.alpha = 1f;
+            if (_resultTextTemplate.rectTransform != null)
+            {
+                _resultTextTemplate.rectTransform.localScale = Vector3.one;
+            }
+
+            _resultTextTemplate.gameObject.SetActive(false);
+        }
+
+        private string BuildPatternResultText(RunBattlePatternResultTextState entry)
+        {
+            var parts = new List<string>();
+            if (entry.AttackPower > 0)
+            {
+                parts.Add(FormatResultPart(
+                    BuildSpriteLabel(_attackResultSpriteIndex, _attackResultFallbackLabel),
+                    entry.AttackPower,
+                    showValue: true));
+            }
+
+            StatusEffectViewData[] statuses = entry.StatusEffects;
+            for (int index = 0; index < statuses.Length; index++)
+            {
+                StatusEffectViewData status = statuses[index];
+                parts.Add(FormatResultPart(
+                    BuildSpriteLabel(_statusResultSpriteIndex, _statusResultFallbackLabel),
+                    status.DisplayValue,
+                    status.ShowValue));
+            }
+
+            return parts.Count > 0
+                ? string.Join(_resultTextSeparator ?? string.Empty, parts)
+                : string.Empty;
+        }
+
+        private string BuildSpriteLabel(int spriteIndex, string fallbackLabel)
+        {
+            return _resultSpriteAsset != null && spriteIndex >= 0
+                ? $"<sprite index={spriteIndex}>"
+                : fallbackLabel ?? string.Empty;
+        }
+
+        private static string FormatResultPart(string label, int value, bool showValue)
+        {
+            string safeLabel = label ?? string.Empty;
+            if (!showValue)
+            {
+                return safeLabel.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(safeLabel)
+                ? value.ToString()
+                : $"{safeLabel.Trim()} {value}";
+        }
+
+        private static string BuildResultTextPresentationKey(
+            IReadOnlyList<int> cellIndices,
+            string text)
+        {
+            return $"{string.Join(",", cellIndices ?? Array.Empty<int>())}|{text ?? string.Empty}";
+        }
+
+        private bool TryCalculatePatternResultWorldPosition(
+            IReadOnlyList<int> cellIndices,
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            if (cellIndices == null || cellIndices.Count == 0)
+            {
+                return false;
+            }
+
+            Vector3 sum = Vector3.zero;
+            int count = 0;
+            for (int index = 0; index < cellIndices.Count; index++)
+            {
+                RectTransform cellTransform = ResolveResultAnchor(cellIndices[index]);
+                if (cellTransform == null)
+                {
+                    continue;
+                }
+
+                cellTransform.GetWorldCorners(_resultTextCorners);
+                sum += (_resultTextCorners[0] + _resultTextCorners[2]) * 0.5f;
+                count++;
+            }
+
+            if (count <= 0)
+            {
+                return false;
+            }
+
+            worldPosition = sum / count;
+            return true;
+        }
+
+        private RectTransform ResolveResultAnchor(int cellIndex)
+        {
+            Image parent = ResolveHighlightParent(cellIndex);
+            if (parent != null)
+            {
+                return parent.rectTransform;
+            }
+
+            if (_slotCells != null &&
+                SlotSpinResult.IsValidIndex(cellIndex) &&
+                cellIndex < _slotCells.Length &&
+                _slotCells[cellIndex] != null)
+            {
+                return _slotCells[cellIndex].rectTransform;
+            }
+
+            return null;
+        }
+
+        private Vector2 PositionResultText(TMP_Text resultText, Vector3 worldPosition)
+        {
+            if (resultText == null || resultText.rectTransform == null)
+            {
+                return Vector2.zero;
+            }
+
+            resultText.rectTransform.position = worldPosition;
+            resultText.rectTransform.anchoredPosition += _resultTextOffset;
+            return resultText.rectTransform.anchoredPosition;
+        }
+
+        private void PlayResultTextHoverTween(
+            TMP_Text resultText,
+            Vector2 baseAnchoredPosition)
+        {
+            if (resultText == null || resultText.rectTransform == null)
+            {
+                return;
+            }
+
+            KillResultTextMotionTweens();
+
+            RectTransform rectTransform = resultText.rectTransform;
+            float appearDuration = Mathf.Max(0.01f, _resultTextAppearDuration);
+            float startScale = Mathf.Max(0.01f, _resultTextAppearStartScale);
+
+            resultText.alpha = 0f;
+            rectTransform.anchoredPosition = baseAnchoredPosition;
+            rectTransform.localScale = Vector3.one * startScale;
+            StartResultTextFloatTween(resultText, baseAnchoredPosition);
+
+            Sequence sequence = DOTween.Sequence()
+                .SetTarget(resultText)
+                .SetUpdate(isIndependentUpdate: true);
+
+            sequence.Insert(0f, DOTween
+                .To(() => resultText.alpha, value => resultText.alpha = value, 1f, appearDuration)
+                .SetEase(Ease.OutQuad));
+            sequence.Insert(0f, rectTransform
+                .DOScale(1f, appearDuration)
+                .SetEase(Ease.OutBack));
+            sequence.OnKill(() =>
+            {
+                if (_resultTextAppearTween == sequence)
+                {
+                    _resultTextAppearTween = null;
+                }
+            });
+
+            _resultTextAppearTween = sequence;
+        }
+
+        private void StartResultTextFloatTween(
+            TMP_Text resultText,
+            Vector2 baseAnchoredPosition)
+        {
+            if (resultText == null || resultText.rectTransform == null)
+            {
+                return;
+            }
+
+            KillResultTextFloatTween();
+
+            RectTransform rectTransform = resultText.rectTransform;
+            float cycleDuration = Mathf.Max(0.1f, _resultTextFloatCycleDuration);
+            float halfDuration = cycleDuration * 0.5f;
+            float amplitude = Mathf.Max(0f, _resultTextFloatAmplitude);
+            Vector2 upPosition = baseAnchoredPosition + new Vector2(0f, amplitude);
+            Vector2 downPosition = baseAnchoredPosition + new Vector2(0f, -amplitude);
+
+            rectTransform.anchoredPosition = downPosition;
+
+            Sequence sequence = DOTween.Sequence()
+                .SetTarget(resultText)
+                .SetUpdate(isIndependentUpdate: true)
+                .SetLoops(-1, LoopType.Yoyo);
+
+            sequence.Append(DOTween
+                .To(
+                    () => rectTransform.anchoredPosition,
+                    value => rectTransform.anchoredPosition = value,
+                    upPosition,
+                    halfDuration)
+                .SetEase(Ease.InOutSine));
+            sequence.OnKill(() =>
+            {
+                if (_resultTextFloatTween == sequence)
+                {
+                    _resultTextFloatTween = null;
+                }
+            });
+
+            _resultTextFloatTween = sequence;
+        }
+
+        private void ShowResultTextAtRest(
+            TMP_Text resultText,
+            Vector2 baseAnchoredPosition)
+        {
+            KillResultTextMotionTweens();
+
+            if (resultText == null || resultText.rectTransform == null)
+            {
+                return;
+            }
+
+            resultText.alpha = 1f;
+            resultText.rectTransform.anchoredPosition = baseAnchoredPosition;
+            resultText.rectTransform.localScale = Vector3.one;
+            StartResultTextFloatTween(resultText, baseAnchoredPosition);
+        }
+
+        private bool HasActiveResultTextMotionTween()
+        {
+            return IsTweenActiveAndPlaying(_resultTextAppearTween) ||
+                IsTweenActiveAndPlaying(_resultTextFloatTween);
+        }
+
+        private void KillResultTextMotionTweens()
+        {
+            if (_resultTextAppearTween != null && _resultTextAppearTween.IsActive())
+            {
+                _resultTextAppearTween.Kill(complete: false);
+            }
+
+            KillResultTextFloatTween();
+            _resultTextAppearTween = null;
+        }
+
+        private void KillResultTextFloatTween()
+        {
+            if (_resultTextFloatTween != null && _resultTextFloatTween.IsActive())
+            {
+                _resultTextFloatTween.Kill(complete: false);
+            }
+
+            _resultTextFloatTween = null;
+        }
+
+        private static bool IsTweenActiveAndPlaying(Tween tween)
+        {
+            return tween != null && tween.IsActive() && tween.IsPlaying();
+        }
+
+        private void PlayResultTextAttackParticleBurst(Vector3 centerWorldPosition)
+        {
+            HideResultTextAttackParticles();
+
+            Sprite attackSprite = ResolveResultTextAttackParticleSprite();
+            RectTransform particleRoot = ResolveResultTextParticleRoot();
+            if (attackSprite == null || _resultTextTemplate == null || particleRoot == null)
+            {
+                return;
+            }
+
+            Vector2 centerAnchoredPosition = WorldToParticleRootAnchoredPosition(
+                particleRoot,
+                centerWorldPosition);
+            int count = Mathf.Max(0, _resultTextParticleCount);
+            float duration = Mathf.Max(0.01f, _resultTextParticleDuration);
+            float riseDuration = Mathf.Clamp(duration * 0.42f, 0.01f, duration);
+            float fallDuration = Mathf.Max(0.01f, duration - riseDuration);
+            float horizontalSpread = Mathf.Max(0f, _resultTextParticleHorizontalSpread);
+            float rise = Mathf.Max(0f, _resultTextParticleRise);
+            float fall = Mathf.Max(0f, _resultTextParticleFall);
+            float startScale = Mathf.Max(0.01f, _resultTextParticleStartScale);
+            float endScale = Mathf.Max(startScale, _resultTextParticleEndScale);
+
+            for (int index = 0; index < count; index++)
+            {
+                Image particle = ResolveResultTextAttackParticle(index, attackSprite, particleRoot);
+                if (particle == null)
+                {
+                    continue;
+                }
+
+                int particleIndex = index;
+                RectTransform rectTransform = particle.rectTransform;
+                float normalized = count <= 1 ? 0.5f : index / (float)(count - 1);
+                float horizontal = Mathf.Lerp(-horizontalSpread, horizontalSpread, normalized) +
+                    UnityEngine.Random.Range(-8f, 8f);
+                float startJitterX = UnityEngine.Random.Range(-6f, 6f);
+                float peakJitterY = UnityEngine.Random.Range(-5f, 7f);
+                float endJitterY = UnityEngine.Random.Range(-7f, 5f);
+                Vector2 startPosition = centerAnchoredPosition + new Vector2(startJitterX, 0f);
+                Vector2 peakPosition = centerAnchoredPosition + new Vector2(horizontal * 0.68f, rise + peakJitterY);
+                Vector2 endPosition = centerAnchoredPosition + new Vector2(horizontal, rise - fall + endJitterY);
+
+                particle.sprite = attackSprite;
+                particle.color = Color.white;
+                particle.gameObject.SetActive(true);
+                particle.transform.SetAsLastSibling();
+                rectTransform.anchoredPosition = startPosition;
+                rectTransform.localScale = Vector3.one * startScale;
+                rectTransform.localRotation = Quaternion.Euler(
+                    0f,
+                    0f,
+                    UnityEngine.Random.Range(-18f, 18f));
+
+                Sequence sequence = DOTween.Sequence()
+                    .SetTarget(particle)
+                    .SetUpdate(isIndependentUpdate: true);
+
+                sequence.Insert(0f, DOTween
+                    .To(
+                        () => rectTransform.anchoredPosition,
+                        value => rectTransform.anchoredPosition = value,
+                        peakPosition,
+                        riseDuration)
+                    .SetEase(Ease.OutCubic));
+                sequence.Insert(riseDuration, DOTween
+                    .To(
+                        () => rectTransform.anchoredPosition,
+                        value => rectTransform.anchoredPosition = value,
+                        endPosition,
+                        fallDuration)
+                    .SetEase(Ease.InQuad));
+                sequence.Insert(0f, rectTransform
+                    .DOScale(endScale, riseDuration)
+                    .SetEase(Ease.OutBack));
+                sequence.Insert(0f, rectTransform
+                    .DOLocalRotate(
+                        new Vector3(0f, 0f, UnityEngine.Random.Range(-80f, 80f)),
+                        duration,
+                        RotateMode.FastBeyond360)
+                    .SetEase(Ease.OutQuad));
+                sequence.Insert(riseDuration, rectTransform
+                    .DOScale(endScale * 0.72f, fallDuration)
+                    .SetEase(Ease.InQuad));
+                sequence.Insert(riseDuration + fallDuration * 0.18f, DOTween
+                    .To(
+                        () => particle.color.a,
+                        alpha => SetGraphicAlpha(particle, alpha),
+                        0f,
+                        fallDuration * 0.82f)
+                    .SetEase(Ease.InQuad));
+                sequence.OnKill(() =>
+                {
+                    if (particleIndex >= 0 &&
+                        particleIndex < _resultTextParticleTweens.Count &&
+                        _resultTextParticleTweens[particleIndex] == sequence)
+                    {
+                        _resultTextParticleTweens[particleIndex] = null;
+                    }
+
+                    if (particle != null)
+                    {
+                        particle.gameObject.SetActive(false);
+                    }
+                });
+
+                EnsureResultTextAttackParticleTweenCapacity(index);
+                _resultTextParticleTweens[index] = sequence;
+            }
+        }
+
+        private Image ResolveResultTextAttackParticle(
+            int index,
+            Sprite attackSprite,
+            RectTransform particleRoot)
+        {
+            if (_resultTextTemplate == null || particleRoot == null)
+            {
+                return null;
+            }
+
+            EnsureResultTextAttackParticleTweenCapacity(index);
+            while (_resultTextParticlePool.Count <= index)
+            {
+                var particleObject = new GameObject(
+                    $"Result Attack Particle {_resultTextParticlePool.Count + 1}",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                particleObject.transform.SetParent(
+                    particleRoot,
+                    worldPositionStays: false);
+
+                Image image = particleObject.GetComponent<Image>();
+                image.raycastTarget = false;
+                image.preserveAspect = true;
+
+                RectTransform rectTransform = image.rectTransform;
+                rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                rectTransform.sizeDelta = _resultTextParticleSize;
+
+                particleObject.SetActive(false);
+                _resultTextParticlePool.Add(image);
+            }
+
+            Image particle = _resultTextParticlePool[index];
+            if (particle != null)
+            {
+                if (particle.rectTransform.parent != particleRoot)
+                {
+                    particle.rectTransform.SetParent(particleRoot, worldPositionStays: false);
+                }
+
+                particle.sprite = attackSprite;
+                particle.rectTransform.sizeDelta = _resultTextParticleSize;
+            }
+
+            return particle;
+        }
+
+        private RectTransform ResolveResultTextParticleRoot()
+        {
+            if (_resultTextParticleRoot != null)
+            {
+                return _resultTextParticleRoot;
+            }
+
+            return _resultTextTemplate != null
+                ? _resultTextTemplate.transform.parent as RectTransform
+                : null;
+        }
+
+        private static Vector2 WorldToParticleRootAnchoredPosition(
+            RectTransform particleRoot,
+            Vector3 worldPosition)
+        {
+            return particleRoot != null
+                ? (Vector2)particleRoot.InverseTransformPoint(worldPosition)
+                : Vector2.zero;
+        }
+
+        private void HideResultTextAttackParticles()
+        {
+            for (int index = 0; index < _resultTextParticlePool.Count; index++)
+            {
+                KillResultTextAttackParticleTween(index);
+                Image particle = _resultTextParticlePool[index];
+                if (particle == null)
+                {
+                    continue;
+                }
+
+                particle.color = Color.white;
+                particle.rectTransform.localScale = Vector3.one;
+                particle.gameObject.SetActive(false);
+            }
+        }
+
+        private void KillResultTextAttackParticleTween(int index)
+        {
+            if (index < 0 || index >= _resultTextParticleTweens.Count)
+            {
+                return;
+            }
+
+            Sequence sequence = _resultTextParticleTweens[index];
+            if (sequence != null && sequence.IsActive())
+            {
+                sequence.Kill(complete: false);
+            }
+
+            _resultTextParticleTweens[index] = null;
+        }
+
+        private void EnsureResultTextAttackParticleTweenCapacity(int index)
+        {
+            while (_resultTextParticleTweens.Count <= index)
+            {
+                _resultTextParticleTweens.Add(null);
+            }
+        }
+
+        private Sprite ResolveResultTextAttackParticleSprite()
+        {
+            if (_resultSpriteAsset == null || _attackResultSpriteIndex < 0)
+            {
+                return null;
+            }
+
+            IReadOnlyList<TMP_SpriteCharacter> characters = _resultSpriteAsset.spriteCharacterTable;
+            if (characters != null &&
+                _attackResultSpriteIndex < characters.Count &&
+                characters[_attackResultSpriteIndex]?.glyph is TMP_SpriteGlyph characterGlyph &&
+                characterGlyph.sprite != null)
+            {
+                return characterGlyph.sprite;
+            }
+
+            IReadOnlyList<TMP_SpriteGlyph> glyphs = _resultSpriteAsset.spriteGlyphTable;
+            if (glyphs != null &&
+                _attackResultSpriteIndex < glyphs.Count)
+            {
+                return glyphs[_attackResultSpriteIndex]?.sprite;
+            }
+
+            return null;
+        }
+
+        private static void SetGraphicAlpha(Graphic graphic, float alpha)
+        {
+            if (graphic == null)
+            {
+                return;
+            }
+
+            Color color = graphic.color;
+            color.a = alpha;
+            graphic.color = color;
         }
 
         private static SlotSymbolType? ResolveHighlightedSymbol(

@@ -52,6 +52,27 @@ namespace SlotRogue.Core.Tests.Combat
         }
 
         [Test]
+        public void ApplyPlayerTurn_EnemyDamageToPlayerMultiplier_ScalesEnemyDamage()
+        {
+            CombatParticipant player = Player(maxHp: 30);
+            CombatParticipant enemy = Enemy(id: 100, maxHp: 30);
+            EnemyCombatant combatant = Combatant(
+                enemy,
+                Plan(CombatEffectKind.Damage, 3, CombatEffectTarget.Enemy));
+            _battle.EnemyDamageToPlayerMultiplier = 1.3f;
+            _battle.StartBattle(player, new[] { combatant });
+
+            _battle.ApplyPlayerTurn(System.Array.Empty<CombatEffect>());
+
+            Assert.That(player.CurrentHp, Is.EqualTo(26));
+            Assert.That(_battle.Events, Has.Some.Matches<CombatEvent>(e =>
+                e.Kind == CombatEventKind.EffectApplied &&
+                e.Phase == BattlePhase.EnemyTurn &&
+                e.Effect.Kind == CombatEffectKind.Damage &&
+                e.Effect.Amount == 4));
+        }
+
+        [Test]
         public void ApplyPlayerTurn_SkippedEnemyAction_StillAdvancesNextPlan()
         {
             CombatParticipant player = Player(maxHp: 30);

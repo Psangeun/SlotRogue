@@ -6,7 +6,10 @@ using SlotRogue.Core.Combat;
 using SlotRogue.Data.Combat;
 using SlotRogue.Relics.Pool;
 using SlotRogue.Slot.Data;
+using SlotRogue.UI.Ads;
 using SlotRogue.UI.Combat.Presentation;
+using SlotRogue.UI.Iap;
+using SlotRogue.UI.SlotPresentation;
 
 namespace SlotRogue.UI.GameFlow
 {
@@ -17,6 +20,7 @@ namespace SlotRogue.UI.GameFlow
         private readonly RunBattleScreenStateUpdater _stateUpdater;
         private readonly EnemyVisibleIntentState _enemyVisibleIntentState = new();
         private readonly RelicShopModel _shop = new();
+        private readonly WaveAdRewardModel _shopAdReward = new();
         private readonly ShopDescriptionView _shopDescriptionView;
 
         private BattleSystem _battle;
@@ -34,6 +38,8 @@ namespace SlotRogue.UI.GameFlow
         private bool _hasSlotResult;
         private bool _swapDecisionActive;
         private bool _shopOpen;
+        private bool _shopAdRewardPending;
+        private int _swapsPerTurn;
         private int _swapsRemaining;
         private int _selectedSwapCellIndex = -1;
         private bool _isBound;
@@ -89,6 +95,10 @@ namespace SlotRogue.UI.GameFlow
             _targetSelectionBlocked = false;
             _hasSlotResult = false;
             _shopOpen = false;
+            _shopAdRewardPending = false;
+            _shopAdReward.Reset();
+            _swapsPerTurn = Math.Max(0, GameFlowSession.SwapCountPerPlayerTurn);
+            _swapsRemaining = _swapsPerTurn;
             _shopDescriptionView?.Hide();
             ResetSwapDecision();
             ApplyBattleStartRelicEffects();
@@ -110,6 +120,7 @@ namespace SlotRogue.UI.GameFlow
             Bind();
             _targetSelectionController.Bind();
             _view.Render(_viewModel.State.CurrentValue);
+            _view.HideCurrentPatternResultText();
             _viewModel.SetActionMode(RunBattleActionMode.Spin, spinInteractable: true);
             Refresh();
             UpdateSlotResult(null, null);
@@ -165,7 +176,8 @@ namespace SlotRogue.UI.GameFlow
             }
 
             _swapDecisionActive = true;
-            _swapsRemaining = Math.Max(0, swapsAvailable);
+            _swapsPerTurn = Math.Max(0, swapsAvailable);
+            _swapsRemaining = _swapsPerTurn;
             _selectedSwapCellIndex = -1;
             _hasSlotResult = true;
             _viewModel.Batch(() =>
@@ -176,7 +188,8 @@ namespace SlotRogue.UI.GameFlow
                 _viewModel.SetSwapState(
                     interactable: _swapsRemaining > 0,
                     _swapsRemaining,
-                    _selectedSwapCellIndex);
+                    _selectedSwapCellIndex,
+                    _swapsPerTurn);
                 _viewModel.SetRelicShop(BuildRelicShopState(canUseShop: false));
             });
         }
@@ -195,7 +208,8 @@ namespace SlotRogue.UI.GameFlow
                 _viewModel.SetSwapState(
                     interactable: _swapsRemaining > 0,
                     _swapsRemaining,
-                    _selectedSwapCellIndex);
+                    _selectedSwapCellIndex,
+                    _swapsPerTurn);
             });
         }
 
@@ -212,11 +226,20 @@ namespace SlotRogue.UI.GameFlow
             UpdateRelicShopState();
         }
 
+        /// <summary>다음 스핀에서 사용할 스왑 게이지를 가득 채운다(레버 복귀 연출 동기화용).</summary>
+        internal void RefillSwapForSpin()
+        {
+            _swapsPerTurn = Math.Max(0, GameFlowSession.SwapCountPerPlayerTurn);
+            _swapsRemaining = _swapsPerTurn;
+            UpdateSwapState(false);
+        }
+
         internal void CompleteBattle()
         {
             _battleCompleted = true;
             _enemyVisibleIntentState.Clear();
             _viewModel.SetSpinInteractable(false);
+            _view.HideCurrentPatternResultText();
             UpdateSwapState(false);
             UpdateRelicShopState(false);
             Refresh();
@@ -229,7 +252,28 @@ namespace SlotRogue.UI.GameFlow
                 _battle,
                 _battle.Enemies,
                 _encounterRoster);
+            _view.HideCurrentPatternResultText();
             Refresh();
+        }
+
+        internal void ShowCurrentPatternResult(SlotPatternPresentationResult pattern)
+        {
+            if (pattern == null)
+            {
+                HideCurrentPatternResult();
+                return;
+            }
+
+            var state = new RunBattlePatternResultTextState(
+                pattern.HighlightedCellIndices,
+                pattern.BonusValue,
+                statusEffects: null);
+            _view.ShowCurrentPatternResultText(state);
+        }
+
+        internal void HideCurrentPatternResult()
+        {
+            _view.HideCurrentPatternResultText();
         }
 
         internal void RefreshVisibleIntentsFromBattle()
@@ -314,8 +358,18 @@ namespace SlotRogue.UI.GameFlow
             _view.SlotCellsDragged += HandleSlotCellsDragged;
             _view.RelicShopPurchaseRequested += HandleRelicShopPurchaseRequested;
             _view.RelicShopRerollRequested += HandleRelicShopRerollRequested;
+            _view.RelicShopAdRewardRequested += HandleRelicShopAdRewardRequested;
             _view.RelicShopToggleRequested += HandleRelicShopToggleRequested;
             _view.ShopOfferSelected += HandleShopOfferSelected;
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.RewardedAvailabilityChanged +=
+                    HandleRewardedAvailabilityChanged;
+                AdsManager.Instance.RewardedSessionEnded +=
+                    HandleRewardedSessionEnded;
+            }
+
+            AdsRemoveState.Changed += HandleAdsRemoveChanged;
             _isBound = true;
         }
 
@@ -331,8 +385,18 @@ namespace SlotRogue.UI.GameFlow
             _view.SlotCellsDragged -= HandleSlotCellsDragged;
             _view.RelicShopPurchaseRequested -= HandleRelicShopPurchaseRequested;
             _view.RelicShopRerollRequested -= HandleRelicShopRerollRequested;
+            _view.RelicShopAdRewardRequested -= HandleRelicShopAdRewardRequested;
             _view.RelicShopToggleRequested -= HandleRelicShopToggleRequested;
             _view.ShopOfferSelected -= HandleShopOfferSelected;
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.RewardedAvailabilityChanged -=
+                    HandleRewardedAvailabilityChanged;
+                AdsManager.Instance.RewardedSessionEnded -=
+                    HandleRewardedSessionEnded;
+            }
+
+            AdsRemoveState.Changed -= HandleAdsRemoveChanged;
             _stateSubscription?.Dispose();
             _stateSubscription = null;
             if (_combatViewModel != null)
@@ -436,8 +500,16 @@ namespace SlotRogue.UI.GameFlow
 
         private void HandleRelicShopPurchaseRequested(int offerIndex)
         {
-            if (!CanUseRelicShop() || !_shop.TryPurchase(offerIndex))
+            if (TryGetRelicShopPurchaseAlert(offerIndex, out string alertMessage))
             {
+                _view.ShowRelicShopAlert(alertMessage);
+                UpdateRelicShopState();
+                return;
+            }
+
+            if (!_shop.TryPurchase(offerIndex))
+            {
+                _view.ShowRelicShopAlert("구매할 수 없습니다.");
                 UpdateRelicShopState();
                 return;
             }
@@ -445,6 +517,68 @@ namespace SlotRogue.UI.GameFlow
             UpdateRelicShopState();
             Refresh();
             _shopDescriptionView?.Hide();
+        }
+
+        private bool TryGetRelicShopPurchaseAlert(int offerIndex, out string message)
+        {
+            message = string.Empty;
+
+            if (!_shopOpen)
+            {
+                message = "상점이 열려 있지 않습니다.";
+                return true;
+            }
+
+            RelicDefinition relic = _shop.OfferAt(offerIndex);
+            if (relic == null)
+            {
+                message = "구매할 수 없습니다.";
+                return true;
+            }
+
+            if (_shop.IsPurchased(offerIndex))
+            {
+                message = "이미 구매한 유물입니다.";
+                return true;
+            }
+
+            if (!CanUseRelicShop())
+            {
+                message = BuildRelicShopUnavailableAlert();
+                return true;
+            }
+
+            int cost = _shop.CostOf(offerIndex);
+            if (GameFlowSession.RunCoins < cost)
+            {
+                message = "별조각이 부족합니다.";
+                return true;
+            }
+
+            if (!_shop.CanPurchase(offerIndex))
+            {
+                message = relic.OccupiesSlot && !GameFlowSession.CanAddRelic(relic)
+                    ? "유물 개수가 가득 찼습니다."
+                    : "더 이상 구매할 수 없는 유물입니다.";
+                return true;
+            }
+
+            return false;
+        }
+
+        private string BuildRelicShopUnavailableAlert()
+        {
+            if (_hasSlotResult || _swapDecisionActive)
+            {
+                return "스핀 후에는 구매할 수 없습니다.";
+            }
+
+            if (_battleCompleted)
+            {
+                return "전투 종료 후에는 구매할 수 없습니다.";
+            }
+
+            return "지금은 구매할 수 없습니다.";
         }
 
         private void HandleRelicShopRerollRequested()
@@ -458,6 +592,75 @@ namespace SlotRogue.UI.GameFlow
             UpdateRelicShopState();
             Refresh();
             _shopDescriptionView?.Hide();
+        }
+
+        private void HandleRelicShopAdRewardRequested()
+        {
+            if (!_shopOpen ||
+                !CanUseRelicShop() ||
+                !CanClaimShopAdReward())
+            {
+                UpdateRelicShopState();
+                return;
+            }
+
+            if (AdsRemoveState.IsRemoved)
+            {
+                GrantShopAdReward();
+                return;
+            }
+
+            AdsManager adsManager = AdsManager.Instance;
+            if (adsManager == null ||
+                !adsManager.CanShowRewarded(RewardedAdPurpose.ShopStarFragment))
+            {
+                UpdateRelicShopState();
+                return;
+            }
+
+            _shopAdRewardPending = true;
+            UpdateRelicShopState();
+            adsManager.ShowRewarded(
+                RewardedAdPurpose.ShopStarFragment,
+                GrantShopAdReward);
+        }
+
+        private void GrantShopAdReward()
+        {
+            _shopAdRewardPending = false;
+            if (!_shopAdReward.TryClaim(out int reward))
+            {
+                UpdateRelicShopState();
+                return;
+            }
+
+            GameFlowSession.AddRunCoins(reward);
+            Refresh();
+        }
+
+        private void HandleRewardedAvailabilityChanged()
+        {
+            UpdateRelicShopState();
+        }
+
+        private void HandleRewardedSessionEnded(
+            RewardedAdPurpose purpose,
+            bool rewarded)
+        {
+            if (purpose != RewardedAdPurpose.ShopStarFragment ||
+                rewarded ||
+                !_shopAdRewardPending)
+            {
+                return;
+            }
+
+            _shopAdRewardPending = false;
+            UpdateRelicShopState();
+        }
+
+        private void HandleAdsRemoveChanged(bool isRemoved)
+        {
+            UpdateRelicShopState();
         }
 
         private void HandleRelicShopToggleRequested()
@@ -581,14 +784,17 @@ namespace SlotRogue.UI.GameFlow
 
         private void UpdateSwapState(bool interactable)
         {
+            int maxSwaps = Math.Max(0, _swapsPerTurn);
+            int swapsRemaining = Math.Min(maxSwaps, Math.Max(0, _swapsRemaining));
             bool canInteract = interactable &&
                 _swapDecisionActive &&
                 _hasSlotResult &&
-                _swapsRemaining > 0;
+                swapsRemaining > 0;
             _viewModel.SetSwapState(
                 canInteract,
-                _swapDecisionActive ? _swapsRemaining : 0,
-                _swapDecisionActive ? _selectedSwapCellIndex : -1);
+                swapsRemaining,
+                _swapDecisionActive ? _selectedSwapCellIndex : -1,
+                maxSwaps);
         }
 
         private void UpdateSwapPreview(SlotTurnResult slotTurnResult)
@@ -615,7 +821,6 @@ namespace SlotRogue.UI.GameFlow
         private void ResetSwapDecision()
         {
             _swapDecisionActive = false;
-            _swapsRemaining = 0;
             _selectedSwapCellIndex = -1;
         }
 
@@ -633,6 +838,9 @@ namespace SlotRogue.UI.GameFlow
         {
             bool canOpen = _shop.HasAnyOffer();
             bool visible = canOpen && _shopOpen;
+            bool canClaimAdReward = visible &&
+                canUseShop &&
+                CanClaimShopAdReward();
             var offers = new RunBattleRelicShopOfferState[_shop.Count];
             for (int index = 0; index < offers.Length; index++)
             {
@@ -664,7 +872,27 @@ namespace SlotRogue.UI.GameFlow
                 RelicShopModel.RerollCost,
                 visible && canUseShop && GameFlowSession.RunCoins >= RelicShopModel.RerollCost,
                 visible && canUseShop,
-                canOpen || visible);
+                canOpen || visible,
+                _shopAdReward.RemainingCount,
+                WaveAdRewardModel.MaxClaims,
+                canClaimAdReward);
+        }
+
+        private bool CanClaimShopAdReward()
+        {
+            if (!_shopAdReward.CanClaim || _shopAdRewardPending)
+            {
+                return false;
+            }
+
+            if (AdsRemoveState.IsRemoved)
+            {
+                return true;
+            }
+
+            AdsManager adsManager = AdsManager.Instance;
+            return adsManager != null &&
+                adsManager.CanShowRewarded(RewardedAdPurpose.ShopStarFragment);
         }
 
         private bool CanUseRelicShop()

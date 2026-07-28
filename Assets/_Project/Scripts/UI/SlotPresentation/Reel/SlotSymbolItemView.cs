@@ -14,6 +14,9 @@ namespace SlotRogue.UI.SlotPresentation.Reel
 
         [SerializeField] private Image _icon;
 
+        [Tooltip("'다시' 표식 배지. ReIcon 오브젝트를 Inspector에서 연결한다.")]
+        [SerializeField] private GameObject _againMark;
+
         public RectTransform RectTransform => _rectTransform != null ? _rectTransform : _rectTransform = (RectTransform)transform;
 
         public Image Icon => _icon;
@@ -54,6 +57,15 @@ namespace SlotRogue.UI.SlotPresentation.Reel
             _icon.sprite = sprite;
             _icon.enabled = sprite != null;
             ApplyNativeSize();
+        }
+
+        /// <summary>"다시" 표식 배지를 켜거나 끈다. 배지가 연결되어 있지 않으면 무시한다.</summary>
+        public void SetAgainMark(bool on)
+        {
+            if (_againMark != null && _againMark.activeSelf != on)
+            {
+                _againMark.SetActive(on);
+            }
         }
 
         public void SetLocalY(float y)

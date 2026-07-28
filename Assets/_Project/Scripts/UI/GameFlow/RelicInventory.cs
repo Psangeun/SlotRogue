@@ -12,7 +12,7 @@ namespace SlotRogue.UI.GameFlow
     {
         private readonly List<RelicDefinition> _relics = new();
 
-        /// <summary>소멸·웨이브 유물의 남은 웨이브 수(유물 id → 잔여). v29는 유물당 1개라 id 키로 충분.</summary>
+        /// <summary>소멸·웨이브 유물의 남은 웨이브 수(유물 id → 잔여). 현재는 유물당 1개라 id 키로 충분.</summary>
         private readonly Dictionary<string, int> _wavesRemaining = new();
 
         /// <summary>보유 유물 목록.</summary>

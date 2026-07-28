@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using SlotRogue.Core.Combat;
@@ -92,7 +93,8 @@ namespace SlotRogue.UI.GameFlow
                     patternResult != null ? patternResult.StartColumn : -1,
                     patternResult != null ? patternResult.MatchLength : 0,
                     CollectHighlightedCellIndices(slotTurnResult?.PatternMatches),
-                    CollectHighlightedCellSymbols(slotTurnResult?.PatternMatches));
+                    CollectHighlightedCellSymbols(slotTurnResult?.PatternMatches),
+                    BuildPatternResultTexts(slotTurnResult?.PatternMatches, lastRequestResult));
             });
         }
 
@@ -265,6 +267,89 @@ namespace SlotRogue.UI.GameFlow
             }
 
             return result;
+        }
+
+        private static RunBattlePatternResultTextState[] BuildPatternResultTexts(
+            IReadOnlyList<SlotPatternMatch> matches,
+            RunCombatRequestResult requestResult)
+        {
+            if (matches == null || matches.Count == 0 || requestResult == null)
+            {
+                return Array.Empty<RunBattlePatternResultTextState>();
+            }
+
+            StatusEffectViewData[] statuses = BuildStatusEffectViews(requestResult.StatusEffectsToApply);
+            if (requestResult.AttackPower <= 0 && statuses.Length == 0)
+            {
+                return Array.Empty<RunBattlePatternResultTextState>();
+            }
+
+            var result = new List<RunBattlePatternResultTextState>(matches.Count);
+            for (int index = 0; index < matches.Count; index++)
+            {
+                int[] cellIndices = CollectMatchCellIndices(matches[index]);
+                if (cellIndices.Length == 0)
+                {
+                    continue;
+                }
+
+                result.Add(new RunBattlePatternResultTextState(
+                    cellIndices,
+                    requestResult.AttackPower,
+                    statuses));
+            }
+
+            return result.ToArray();
+        }
+
+        private static int[] CollectMatchCellIndices(SlotPatternMatch match)
+        {
+            IReadOnlyList<SlotCell> cells = match?.MatchedCells;
+            if (cells == null || cells.Count == 0)
+            {
+                return Array.Empty<int>();
+            }
+
+            var result = new List<int>(cells.Count);
+            for (int index = 0; index < cells.Count; index++)
+            {
+                SlotCell cell = cells[index];
+                int flattenedIndex = SlotSpinResult.ToIndex(cell.Col, cell.Row);
+                if (SlotSpinResult.IsValidIndex(flattenedIndex) &&
+                    !result.Contains(flattenedIndex))
+                {
+                    result.Add(flattenedIndex);
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static StatusEffectViewData[] BuildStatusEffectViews(
+            IReadOnlyList<TargetedStatusEffectSpec> statusEffects)
+        {
+            if (statusEffects == null || statusEffects.Count == 0)
+            {
+                return Array.Empty<StatusEffectViewData>();
+            }
+
+            var result = new List<StatusEffectViewData>(statusEffects.Count);
+            for (int index = 0; index < statusEffects.Count; index++)
+            {
+                StatusEffectSpec spec = statusEffects[index].Spec;
+                if (!spec.IsValid)
+                {
+                    continue;
+                }
+
+                result.Add(StatusEffectPresentationMapper.Map(
+                    spec.Kind,
+                    spec.Magnitude,
+                    spec.Magnitude,
+                    spec.Duration));
+            }
+
+            return result.ToArray();
         }
     }
 }

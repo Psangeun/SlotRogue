@@ -15,7 +15,7 @@
 | [`combat-damage-vfx.md`](./combat-damage-vfx.md) | draft | 피해 VFX profile/module 조합, Animation Event Impact cue, 요청 단위 CueHub 구독·발행·정리 |
 | [`attribute-status-interference.md`](./attribute-status-interference.md) | draft | 유물 연계 6속성, 몬스터/보스 방해, v6 기준 구현 목표와 현재 코드 차이 |
 | [`game-flow.md`](./game-flow.md) | draft | 게임 시작, 시작 유물, 맵, 전투, 보상 반복 루프 |
-| [`relic-system.md`](./relic-system.md) | draft | v23 유물 80종, Phase 1 풀, 선택·보상·전투 단일 런타임 경로 |
+| [`relic-system.md`](./relic-system.md) | draft | v30 별조각 상점 유물 55종, 아이콘 Addressables, 상점·전투 단일 런타임 경로 |
 | [`leaderboard.md`](./leaderboard.md) | accepted | UGS 인증, 최고기록 metadata, 제출·조회·GameStart UI |
 | [`rewarded-ads.md`](./rewarded-ads.md) | accepted | LevelPlay 초기화, Rewarded 로드·표시·보상, 부활·리롤 연결 |
 | [`remove-ads-iap.md`](./remove-ads-iap.md) | accepted | `remove_ads` Non-Consumable 구매 상태, 보상형 광고 스킵, Store 복원 경계 |

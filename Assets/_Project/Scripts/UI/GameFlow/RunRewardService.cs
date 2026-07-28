@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SlotRogue.Relics.Pool;
+using SlotRogue.Slot.Data;
 
 namespace SlotRogue.UI.GameFlow
 {
@@ -127,6 +128,12 @@ namespace SlotRogue.UI.GameFlow
                 return false;
             }
 
+            if (RunRewardCatalog.IsOneTimeProposal(reward.ProposalId) &&
+                GameFlowSession.HasAcquiredProposal(reward.ProposalId))
+            {
+                return false;
+            }
+
             return reward.ProposalEffect != RunProposalEffectKind.RelicSlotCapacity ||
                 GameFlowSession.RelicSlotCapacity < GameFlowSession.MaxRelicSlotCapacity;
         }
@@ -193,7 +200,9 @@ namespace SlotRogue.UI.GameFlow
             switch (reward.ProposalEffect)
             {
                 case RunProposalEffectKind.SymbolWeight:
-                    GameFlowSession.ApplySymbolWeightReward(reward.Symbols, reward.Amount);
+                    GameFlowSession.ApplySymbolWeightIncreaseReward(
+                        reward.Symbols,
+                        reward.Amount * SlotSymbolPool.ProposalWeightUnit);
                     break;
                 case RunProposalEffectKind.SymbolBaseDamage:
                     GameFlowSession.ApplySymbolBaseDamageReward(reward.Symbols, reward.Amount);

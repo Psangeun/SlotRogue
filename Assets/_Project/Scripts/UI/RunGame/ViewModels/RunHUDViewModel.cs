@@ -53,7 +53,7 @@ namespace SlotRogue.UI.RunGame.ViewModels
 
         private static string BuildSymbolProbabilityText(SlotSymbolPool pool)
         {
-            int total = pool != null ? pool.TotalWeight : 0;
+            float total = pool != null ? pool.TotalWeight : 0f;
             IReadOnlyList<SlotSymbolType> symbols =
                 SlotSymbolPool.ProbabilityDisplayOrder;
             var builder = new StringBuilder();
@@ -70,7 +70,7 @@ namespace SlotRogue.UI.RunGame.ViewModels
                 }
 
                 SlotSymbolType symbol = symbols[index];
-                double percent = total > 0
+                double percent = total > 0f
                     ? pool.GetWeight(symbol) * 100d / total
                     : 0d;
                 builder

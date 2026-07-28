@@ -21,8 +21,7 @@ namespace SlotRogue.UI.GameFlow
         ICombatStatusPresentationCommands
     {
         [SerializeField] private RunBattlePlayerHudView _playerHudView;
-        [SerializeField] private RectTransform _playerStatusPanelRoot;
-        [SerializeField] private StatusEffectIconSet _statusEffectIconSet;
+        [SerializeField] private PlayerStatusPanelView _playerStatusPanelView;
         [SerializeField] private RunBattleSlotBoardView _slotBoardView;
         [SerializeField] private RunBattleSpinButtonView _actionView;
         [SerializeField] private RunBattleShopView _shopView;
@@ -33,6 +32,9 @@ namespace SlotRogue.UI.GameFlow
 
         [Header("Currency HUD")]
         [SerializeField] private RunBattleCurrencyView _currencyView;
+
+        [Header("Swap HUD")]
+        [SerializeField] private RunBattleSwapHudView _swapHudView;
 
         [Header("Shop Shutter")]
         [SerializeField] private RectTransform[] _slotScreenShutters = Array.Empty<RectTransform>();
@@ -50,7 +52,6 @@ namespace SlotRogue.UI.GameFlow
         private bool _hasRenderedShopBoardVisibility;
         private bool _shopBoardTransitionActive;
         private bool _shopBoardVisible;
-        private PlayerStatusPanelView _playerStatusPanelView;
 
         private readonly struct SlotShutterRestPose
         {
@@ -74,6 +75,8 @@ namespace SlotRogue.UI.GameFlow
         public event Action<int> RelicShopPurchaseRequested;
 
         public event Action RelicShopRerollRequested;
+
+        public event Action RelicShopAdRewardRequested;
 
         public event Action RelicShopToggleRequested;
 
@@ -104,8 +107,6 @@ namespace SlotRogue.UI.GameFlow
             _shopFlipSequence?.Kill();
             _shopFlipSequence = null;
             _shopBoardTransitionActive = false;
-            _playerStatusPanelView?.Dispose();
-            _playerStatusPanelView = null;
             UnsubscribeActions();
         }
 
@@ -116,7 +117,9 @@ namespace SlotRogue.UI.GameFlow
             RunBattlePresentationOverlayView presentationOverlayView,
             RunBattleWorldView worldView,
             RunBattleShopView shopView = null,
-            RunBattleCurrencyView currencyView = null)
+            RunBattleCurrencyView currencyView = null,
+            RunBattleSwapHudView swapHudView = null,
+            PlayerStatusPanelView playerStatusPanelView = null)
         {
             UnsubscribeActions();
             _playerHudView = playerHudView;
@@ -124,6 +127,11 @@ namespace SlotRogue.UI.GameFlow
             _actionView = actionView;
             _presentationOverlayView = presentationOverlayView;
             _worldView = worldView;
+            if (playerStatusPanelView != null)
+            {
+                _playerStatusPanelView = playerStatusPanelView;
+            }
+
             if (shopView != null)
             {
                 _shopView = shopView;
@@ -134,6 +142,11 @@ namespace SlotRogue.UI.GameFlow
                 _currencyView = currencyView;
             }
 
+            if (swapHudView != null)
+            {
+                _swapHudView = swapHudView;
+            }
+
             EnsureReferences();
             SubscribeActions();
         }
@@ -141,13 +154,12 @@ namespace SlotRogue.UI.GameFlow
         public bool EnsureReferences()
         {
             _worldView?.EnsureReferences();
-            EnsurePlayerStatusPanel();
 
-            // 슬롯 셔터 연출·보유유물 아이콘 줄은 선택 요소다. 미배선이어도 각자 null-guard되므로
-            // 필수 참조에서 제외한다(없으면 셔터 연출/보유유물 표시만 생략).
+            // Optional shield/relic icon references are guarded at each call site, but core battle
+            // screen controls must be wired here.
             bool complete = _playerHudView != null &&
-                _playerStatusPanelRoot != null &&
-                _statusEffectIconSet != null &&
+                _playerStatusPanelView != null &&
+                _playerStatusPanelView.EnsureReferences() &&
                 _slotBoardView != null &&
                 _actionView != null &&
                 _shopView != null &&
@@ -165,18 +177,6 @@ namespace SlotRogue.UI.GameFlow
             }
 
             return complete;
-        }
-
-        private void EnsurePlayerStatusPanel()
-        {
-            if (_playerStatusPanelView == null &&
-                _playerStatusPanelRoot != null &&
-                _statusEffectIconSet != null)
-            {
-                _playerStatusPanelView = new PlayerStatusPanelView(
-                    _playerStatusPanelRoot,
-                    _statusEffectIconSet);
-            }
         }
 
         public bool HasRequiredControls()
@@ -209,6 +209,7 @@ namespace SlotRogue.UI.GameFlow
             _playerStatusPanelView?.Render(state.PlayerStatuses);
             _slotBoardView?.Render(state);
             _actionView?.Render(state);
+            _swapHudView?.Render(state.Swap, shopVisible);
             RenderShopBoardTransition(shopVisible);
             RenderShopViewWhenReady(state, shopVisible);
             _currencyView?.Render(state.RunCoins, shopVisible);
@@ -222,6 +223,21 @@ namespace SlotRogue.UI.GameFlow
             }
 
             _worldView?.Render(state);
+        }
+
+        public void ShowRelicShopAlert(string message)
+        {
+            _shopView?.ShowAlert(message);
+        }
+
+        public void ShowCurrentPatternResultText(RunBattlePatternResultTextState state)
+        {
+            _slotBoardView?.ShowCurrentPatternResultText(state);
+        }
+
+        public void HideCurrentPatternResultText()
+        {
+            _slotBoardView?.HideCurrentPatternResultText();
         }
 
         private void RenderShopViewWhenReady(RunBattleScreenState state, bool shopVisible)
@@ -793,26 +809,16 @@ namespace SlotRogue.UI.GameFlow
         private string BuildMissingReferenceSummary()
         {
             var missing = new List<string>();
-            if (_playerHudView == null)
-                missing.Add("Player HUD View");
-            if (_playerStatusPanelRoot == null)
-                missing.Add("Player Status Panel Root");
-            if (_statusEffectIconSet == null)
-                missing.Add("Status Effect Icon Set");
-            if (_slotBoardView == null)
-                missing.Add("Slot Board View");
-            if (_actionView == null)
-                missing.Add("Action View");
-            if (_shopView == null)
-                missing.Add("Shop View");
-            if (_shopButton == null)
-                missing.Add("Shop Button");
-            if (_currencyView == null)
-                missing.Add("Currency View");
-            if (_presentationOverlayView == null)
-                missing.Add("Presentation Overlay View");
-            if (_worldView == null)
-                missing.Add("World View");
+            if (_playerHudView == null) missing.Add("Player HUD View");
+            if (_playerStatusPanelView == null) missing.Add("Player Status Panel View");
+            else if (!_playerStatusPanelView.EnsureReferences()) missing.Add("Player Status Panel References");
+            if (_slotBoardView == null) missing.Add("Slot Board View");
+            if (_actionView == null) missing.Add("Action View");
+            if (_shopView == null) missing.Add("Shop View");
+            if (_shopButton == null) missing.Add("Shop Button");
+            if (_currencyView == null) missing.Add("Currency View");
+            if (_presentationOverlayView == null) missing.Add("Presentation Overlay View");
+            if (_worldView == null) missing.Add("World View");
             return missing.Count > 0 ? string.Join(", ", missing) : "None";
         }
 
@@ -833,6 +839,7 @@ namespace SlotRogue.UI.GameFlow
             {
                 _shopView.PurchaseRequested += HandleRelicShopPurchaseRequested;
                 _shopView.RerollRequested += HandleRelicShopRerollRequested;
+                _shopView.AdRewardRequested += HandleRelicShopAdRewardRequested;
                 _shopView.OfferSelected += HandleShopOfferSelected;
             }
 
@@ -856,6 +863,7 @@ namespace SlotRogue.UI.GameFlow
             {
                 _shopView.PurchaseRequested -= HandleRelicShopPurchaseRequested;
                 _shopView.RerollRequested -= HandleRelicShopRerollRequested;
+                _shopView.AdRewardRequested -= HandleRelicShopAdRewardRequested;
                 _shopView.OfferSelected -= HandleShopOfferSelected;
             }
 
@@ -885,6 +893,11 @@ namespace SlotRogue.UI.GameFlow
         private void HandleRelicShopRerollRequested()
         {
             RelicShopRerollRequested?.Invoke();
+        }
+
+        private void HandleRelicShopAdRewardRequested()
+        {
+            RelicShopAdRewardRequested?.Invoke();
         }
 
         private void HandleRelicShopToggleRequested()

@@ -1,11 +1,11 @@
 # 보상형 광고
 
 **Status**: accepted
-**Last updated**: 2026-06-19
+**Last updated**: 2026-07-09
 
 ## Purpose
 
-LevelPlay Rewarded 광고를 게임오버 부활과 보상 리롤, 추가 보상, 보상 2배에 연결한다. 광고 SDK 생명주기는 영속 Manager가 소유하고, 게임 상태 변경은 reward callback을 받은 뒤 기존 RunGame 흐름에서만 수행한다.
+LevelPlay Rewarded 광고를 게임오버 부활과 보상 리롤, 추가 보상, 보상 2배, 전투 상점 별조각 지급에 연결한다. 광고 SDK 생명주기는 영속 Manager가 소유하고, 게임 상태 변경은 reward callback을 받은 뒤 기존 RunGame 흐름에서만 수행한다.
 
 ## Decisions
 
@@ -50,6 +50,9 @@ BootScene / AdsManager.Awake
 | `RewardReroll` | `reward_reroll` | 보상 화면당 1회 기존 후보 생성 로직을 사용하는 `RunRewardViewModel.ApplyRewardedReroll()` 호출 |
 | `ExtraReward` | `reward_extra` | 엘리트/보스 보상 화면당 1회 후보 하나 추가 |
 | `RewardDouble` | `reward_double` | 보상 화면당 1회 선택한 보상 효과를 두 번 적용 |
+| `ShopStarFragment` | `shop_star_fragment` | wave당 최대 2회, reward callback 1회마다 별조각 1개 지급 |
+
+전투 상점 광고 횟수는 `WaveAdRewardModel`이 관리한다. `BattleScreenController.BeginBattle()`에서 `2/2`로 초기화하고 보상 지급마다 `1/2`, `0/2`로 감소한다. `0/2`에서는 버튼을 비활성화하며, 광고가 실패하거나 보상 없이 종료되면 횟수를 소비하지 않는다.
 
 ## Defeat flow
 
@@ -61,6 +64,8 @@ BootScene / AdsManager.Awake
 
 - `RunRewardView`: 리롤·추가 보상·보상 2배 입력 event, interactable 상태, 구매 상태별 문구
 - `RunDefeatView`: 몬스터 초상화·카운트다운·부활 버튼과 최종 결과를 단계별 렌더링
+- `RunBattleShopView`: 상점 광고 입력 event, 남은 wave 횟수, interactable 상태 렌더링
+- `BattleScreenController`: wave별 광고 횟수, 별조각 지급, 상점 광고 준비 상태 연결
 - `RunGameSceneRoot`: 화면별 1회 사용 상태, 광고 요청, 기존 ViewModel·전투 command 실행
 - `AdsManager`: SDK 초기화·로드·표시·보상 callback
 

@@ -26,10 +26,12 @@ namespace SlotRogue.UI.GameFlow
         public int relicSlotCapacity;
         public bool hasRevivedThisRun;
         public string[] relicIds;
+        public string[] proposalIds;
         public int[] symbolTypes;
+        public float[] symbolWeights;
         public int[] symbolBaseDamageBonuses;
 
-        // 호환을 위해 필드명은 유지하지만 값의 의미는 심볼별 한 칸 출현 확률값이다.
+        // 구 저장본 호환용 10배 정수 스케일 가중치. 새 저장/복원 경로는 symbolWeights를 사용한다.
         public int[] symbolCounts;
     }
 }

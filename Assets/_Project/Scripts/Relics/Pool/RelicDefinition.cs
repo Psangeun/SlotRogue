@@ -4,7 +4,7 @@ using SlotRogue.Slot.Data;
 namespace SlotRogue.Relics.Pool
 {
     /// <summary>
-    /// v23.0 유물 한 개의 정의(코드 카탈로그 데이터). 데이터만 보유하며 실행 로직은 갖지 않는다.
+    /// v30 유물 한 개의 정의(코드 카탈로그 데이터). 데이터만 보유하며 실행 로직은 갖지 않는다.
     /// 실행은 <c>RelicEffectRunner</c>(UI.GameFlow)가 <see cref="EffectType"/>로 분기해 처리한다.
     /// </summary>
     public sealed class RelicDefinition

@@ -50,7 +50,7 @@ namespace SlotRogue.UI.GameFlow
                 RunCurrencyText.ApplySpriteAsset(_priceText, _currencySpriteAsset);
                 _priceText.text = offer.Purchased
                     ? "구매완료"
-                    : RunCurrencyText.FormatAmount(offer.Cost, _currencySpriteAsset);
+                    : RunCurrencyText.FormatPlainAmount(offer.Cost);
             }
         }
 

@@ -47,6 +47,8 @@ namespace SlotRogue.Core.Combat
 
         public bool CanApplyPlayerTurn => CurrentPhase == BattlePhase.PlayerTurn;
 
+        public float EnemyDamageToPlayerMultiplier { get; set; } = 1f;
+
         public bool TryGetUpcomingEnemyTurn(
             CombatParticipantId participantId,
             out EnemyUpcomingTurn upcomingTurn)
@@ -261,8 +263,10 @@ namespace SlotRogue.Core.Combat
             CombatParticipant source,
             CombatParticipantId selectedTargetId)
         {
+            IReadOnlyList<EnemyPlannedAction> adjustedActions =
+                ApplyEnemyDamageToPlayerMultiplier(actions);
             bool actionReachedBattleEnd = _actionResolver.ResolveEnemyPlannedActions(
-                actions,
+                adjustedActions,
                 source,
                 _player,
                 _enemies,
@@ -279,6 +283,74 @@ namespace SlotRogue.Core.Combat
 
             TryEndBattle();
             return true;
+        }
+
+        private IReadOnlyList<EnemyPlannedAction> ApplyEnemyDamageToPlayerMultiplier(
+            IReadOnlyList<EnemyPlannedAction> actions)
+        {
+            if (actions == null ||
+                actions.Count == 0 ||
+                Math.Abs(EnemyDamageToPlayerMultiplier - 1f) <= float.Epsilon)
+            {
+                return actions;
+            }
+
+            var adjusted = new EnemyPlannedAction[actions.Count];
+            for (int index = 0; index < actions.Count; index++)
+            {
+                EnemyPlannedAction action = actions[index];
+                adjusted[index] = AdjustEnemyActionDamage(action);
+            }
+
+            return adjusted;
+        }
+
+        private EnemyPlannedAction AdjustEnemyActionDamage(EnemyPlannedAction action)
+        {
+            if (action == null || !action.HasEffect)
+            {
+                return action;
+            }
+
+            EnemyActionEffect actionEffect = action.Effect;
+            if (actionEffect.Kind != EnemyActionEffectKind.Combat)
+            {
+                return action;
+            }
+
+            CombatEffect effect = actionEffect.CombatEffect;
+            if (effect.Kind != CombatEffectKind.Damage ||
+                effect.Target.Mode == CombatTargetMode.Self)
+            {
+                return action;
+            }
+
+            int adjustedDamage = ScaleDamage(effect.Amount, EnemyDamageToPlayerMultiplier);
+            if (adjustedDamage == effect.Amount)
+            {
+                return action;
+            }
+
+            var adjustedEffect = new CombatEffect(
+                effect.Kind,
+                adjustedDamage,
+                effect.Target,
+                effect.StatusEffect,
+                effect.DamageOrigin);
+            return new EnemyPlannedAction(
+                action.ActionKey,
+                action.ActionName,
+                EnemyActionEffect.FromCombatEffect(adjustedEffect));
+        }
+
+        private static int ScaleDamage(int amount, float multiplier)
+        {
+            if (amount <= 0 || multiplier <= 0f)
+            {
+                return 0;
+            }
+
+            return (int)Math.Ceiling(amount * multiplier);
         }
 
         private void RunParticipantTurnStart(CombatParticipant participant)

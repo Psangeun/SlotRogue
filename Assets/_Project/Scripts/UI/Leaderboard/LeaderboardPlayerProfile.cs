@@ -81,6 +81,8 @@ namespace SlotRogue.UI.Leaderboard
         private const string MessageKey = "SlotRogue.Leaderboard.Profile.Message";
         private const string DefaultMessage = "허접ㅋ";
 
+        internal static event Action<string> ProfileIconChanged;
+
         internal static string ProfileIconId =>
             PlayerPrefs.GetString(ProfileIconKey, string.Empty);
 
@@ -95,8 +97,15 @@ namespace SlotRogue.UI.Leaderboard
 
         internal static void SaveProfileIcon(string profileIconId)
         {
-            PlayerPrefs.SetString(ProfileIconKey, profileIconId ?? string.Empty);
+            string normalized = profileIconId?.Trim() ?? string.Empty;
+            if (string.Equals(ProfileIconId, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            PlayerPrefs.SetString(ProfileIconKey, normalized);
             PlayerPrefs.Save();
+            ProfileIconChanged?.Invoke(normalized);
         }
 
         internal static void SaveMessage(string message)

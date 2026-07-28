@@ -186,7 +186,6 @@ namespace SlotRogue.UI.RunGame
                 }
 
                 cell.SetActive(true);
-                cell.SetHighlight(false);
                 cell.SetClick(null);
 
                 RunInventoryRelicViewState relic = relics[index];
