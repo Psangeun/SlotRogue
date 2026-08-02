@@ -13,6 +13,8 @@ namespace SlotRogue.UI.Ads
         private const string RewardDoublePlacement = "reward_double";
         private const string ShopStarFragmentPlacement = "shop_star_fragment";
         private const float ReloadDelaySeconds = 2f;
+        private const string EditorMockAppKey = "editor";
+        private const string EditorMockRewardedAdUnitId = "editor_rewarded";
 
         [SerializeField] private string appKey;
         [SerializeField] private string rewardedAdUnitId;
@@ -402,6 +404,14 @@ namespace SlotRogue.UI.Ads
             out string runtimeAppKey,
             out string runtimeRewardedAdUnitId)
         {
+            if (ShouldUseEditorMockIds())
+            {
+                runtimeAppKey = EditorMockAppKey;
+                runtimeRewardedAdUnitId = EditorMockRewardedAdUnitId;
+                GameLog.Info("[AdsManager] Using LevelPlay editor mock identifiers.");
+                return true;
+            }
+
             bool useDebugIds = Debug.isDebugBuild && !allowLiveAdsInDebugBuilds;
             runtimeAppKey = NormalizeId(useDebugIds ? debugAppKey : appKey);
             runtimeRewardedAdUnitId =
@@ -436,8 +446,22 @@ namespace SlotRogue.UI.Ads
 
         private string GetRuntimeRewardedAdUnitId()
         {
+            if (ShouldUseEditorMockIds())
+            {
+                return EditorMockRewardedAdUnitId;
+            }
+
             bool useDebugIds = Debug.isDebugBuild && !allowLiveAdsInDebugBuilds;
             return NormalizeId(useDebugIds ? debugRewardedAdUnitId : rewardedAdUnitId);
+        }
+
+        private static bool ShouldUseEditorMockIds()
+        {
+#if UNITY_EDITOR
+            return true;
+#else
+            return false;
+#endif
         }
 
         private static string NormalizeId(string value) =>

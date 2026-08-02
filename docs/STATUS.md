@@ -1,6 +1,6 @@
 ﻿# 프로젝트 상태
 
-_Last updated: 2026-07-28_
+_Last updated: 2026-08-02_
 
 ---
 
@@ -26,15 +26,15 @@ _Last updated: 2026-07-28_
 
 **유물 아이콘 키** — [ADR-0009](./adr/0009-relic-icon-addressable-keys.md): `RelicDefinition.IconKey`를 상점·보상·인벤토리 ViewState까지 전달하고 조립 계층이 Addressable Sprite를 캐시·해제한다. 현재 v30 시트 `Assets/_Project/Art/Relics/icon-Sheet_300.png`는 `Relic Sheet 300` 주소로 등록하며, 56개 sub-sprite 중 앞 55개를 v30 유물 카탈로그 순서대로 사용한다.
 
-**UGS 런 리더보드** — [`feature-leaderboard`](./exec-plans/completed/feature-leaderboard.md) **완료** (2026-06-12): `Slot_Rogue_Leaderboard`에 클리어 wave 최고기록과 도달 wave·유물 ID metadata를 제출하고 GameStart에서 Top 10과 Player Name을 조회한다. 실제 네트워크 검증 전 Cloud Project 연결이 필요하다.
+**UGS 런 리더보드** — [`feature-leaderboard`](./exec-plans/completed/feature-leaderboard.md) **완료** (2026-06-12): `Slot_Rogue_Leaderboard`에 도달 wave 최고기록과 wave·유물 ID·심볼 카운트·프로필 metadata를 제출하고 GameStart에서 Top 10과 Player Name을 조회한다. Cloud Project ID `b1aeb280-d45e-44b0-b0cb-0279b956f852`와 Dashboard 설정(`Highest to lowest`, `Best score`, `Numeric`, 매주 화요일 15:00 UTC 리셋)은 확인했으며, mock을 끈 실제 제출/조회 실기기 검증이 남아 있다.
 
 **리더보드 프로필 / 패배 선택** — [`feature-leaderboard-profile-defeat-actions`](./exec-plans/completed/feature-leaderboard-profile-defeat-actions.md) **완료** (2026-06-12): 최초 닉네임 등록을 필수화하고 패배 기록 자동 제출 및 RESTART·RANKING·HOME 선택을 추가했다. [ADR-0012](./adr/0012-leaderboard-nickname-only-profile.md)에 따라 국가는 저장하지 않는다.
 
-**LevelPlay Rewarded 광고** — [`feature-levelplay-rewarded-ads`](./exec-plans/active/feature-levelplay-rewarded-ads.md): BootScene의 영속 `AdsManager`에서 LevelPlay 9.4.1을 초기화한다. 패배 시 몬스터 초상화와 5초 부활 유예를 표시하고, 시간 초과 뒤에는 심볼별 족보 등장 횟수, 기본 공격력, 유물 공격력을 포함한 결과 화면으로 전환한다. 전체 solution 컴파일은 통과했으며 Unity Test Runner와 Android 실기기 검증이 남아 있다.
+**LevelPlay Rewarded 광고** — [`feature-levelplay-rewarded-ads`](./exec-plans/active/feature-levelplay-rewarded-ads.md): BootScene의 영속 `AdsManager`에서 LevelPlay 9.4.1을 초기화한다. 패배 시 몬스터 초상화와 5초 부활 유예를 표시하고, 시간 초과 뒤에는 심볼별 족보 등장 횟수, 기본 공격력, 유물 공격력을 포함한 결과 화면으로 전환한다. 전체 solution 컴파일은 통과했다. 2026-08-02 릴리즈 감사 기준 `00_TitleScene`의 production `appKey`/`rewardedAdUnitId`는 비어 있고 `productionAdsEnabled`는 꺼져 있으므로, 릴리즈 빌드 전 실제 LevelPlay 값 주입과 Android 실기기 검증이 필요하다.
 
-**광고 제거 IAP** — [`feature-remove-ads-iap`](./exec-plans/active/feature-remove-ads-iap.md): `remove_ads` Non-Consumable 구매 상태를 PlayerPrefs에 캐시하고, 구매자는 부활·리롤·추가 보상·보상 2배의 기존 제한을 유지한 채 Rewarded 광고 시청만 건너뛴다. GameStart에는 기존 Start 버튼 스타일의 구매 버튼을 씬 오브젝트로 직렬화하고 Codeless IAP 구매·복원 이벤트를 Inspector에서 연결한다.
+**광고 제거 IAP** — [`feature-remove-ads-iap`](./exec-plans/active/feature-remove-ads-iap.md): `remove_ads` Non-Consumable 구매 상태를 PlayerPrefs에 캐시하고, 구매자는 부활·리롤·추가 보상·보상 2배의 기존 제한을 유지한 채 Rewarded 광고 시청만 건너뛴다. GameStart에는 기존 Start 버튼 스타일의 구매 버튼을 씬 오브젝트로 직렬화하고 Codeless IAP 구매 이벤트를 Inspector에서 연결한다. Play Console 상품 활성화, 라이선스 테스트 구매, 복원 흐름 검증이 출시 전 확인 항목이다.
 
-**로컬 알림 / 주간 랭킹** — [`feature-notifications-weekly-ranking`](./exec-plans/completed/feature-notifications-weekly-ranking.md) **완료** (2026-06-14): 앱 이탈 24시간 뒤 복귀 알림과 한국 수요일 00:00 랭킹 리셋 3시간 전 마감 알림을 로컬 예약한다. 실제 점수 리셋은 UGS Dashboard의 주간 Reset schedule로 분리하며 운영 설정과 실기기 검증이 남아 있다.
+**로컬 알림 / 주간 랭킹** — [`feature-notifications-weekly-ranking`](./exec-plans/completed/feature-notifications-weekly-ranking.md) **완료** (2026-06-14): 앱 이탈 24시간 뒤 복귀 알림과 한국 수요일 00:00 랭킹 리셋 3시간 전 마감 알림을 로컬 예약한다. 실제 점수 리셋은 UGS Dashboard의 주간 Reset schedule로 분리한다. 운영 설정은 2026-08-04 15:00 UTC 시작, 매주 화요일 15:00 UTC 리셋으로 확인했으며 로컬 알림 실기기 검증이 남아 있다.
 
 **슬롯 MVP** — [`feature-slot-core`](./exec-plans/active/feature-slot-core.md): `Dev_Slot`에서 5×3 검증. 다음: 게임 플로우 전투 씬에서 `SlotCombatRequest` 연결.
 
@@ -138,6 +138,8 @@ High-level 마일스톤. 각 주차 안에서 기능 단위 exec-plan으로 분�
 - **기획 문서 미확정**: 로그라이크 메타 / 경제.
 - **브랜치 / PR 워크플로 미정**: 사용해본 후 결정 → ADR로 박제 예정.
 - **ADR-0001 Status**: 구현 완료, `accepted` 전환은 팀 합의 후.
+- **출시 게이트**: LevelPlay production ID 주입, `remove_ads` Play Console 상품/복원 검증, UGS live 제출/조회 검증, AAB 서명 빌드, Play Console Data safety/개인정보처리방침/콘텐츠 등급 입력, `user.keystore` 접근 권한 확인.
+- **릴리즈 위생**: 임시 성능 테스트 JSON과 `_Recovery` 복사본은 정리했다. `Assets/_Recovery/0.unity`는 추적 중이나 빌드 씬에는 없으므로 출시 브랜치에서 유지할 이유가 있는지 확인해야 한다.
 
 ---
 

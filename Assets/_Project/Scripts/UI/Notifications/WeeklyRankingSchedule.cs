@@ -46,6 +46,40 @@ namespace SlotRogue.UI.Notifications
             return deadlineUtc;
         }
 
+        public static DateTime GetNextDeadlineNotificationUtc(
+            DateTime utcNow,
+            TimeSpan deadlineLeadTime,
+            TimeSpan minimumFutureDelay)
+        {
+            DateTime normalizedUtc = NormalizeUtc(utcNow);
+            TimeSpan normalizedLeadTime =
+                deadlineLeadTime < TimeSpan.Zero
+                    ? TimeSpan.Zero
+                    : deadlineLeadTime;
+            TimeSpan normalizedMinimumDelay =
+                minimumFutureDelay < TimeSpan.Zero
+                    ? TimeSpan.Zero
+                    : minimumFutureDelay;
+            DateTime resetUtc = GetNextResetUtc(normalizedUtc);
+            DateTime deadlineUtc = resetUtc.Subtract(normalizedLeadTime);
+
+            if (deadlineUtc > normalizedUtc)
+            {
+                return deadlineUtc;
+            }
+
+            if (normalizedUtc < resetUtc)
+            {
+                DateTime immediateUtc = normalizedUtc.Add(normalizedMinimumDelay);
+                if (immediateUtc < resetUtc)
+                {
+                    return DateTime.SpecifyKind(immediateUtc, DateTimeKind.Utc);
+                }
+            }
+
+            return GetNextDeadlineUtc(resetUtc, normalizedLeadTime);
+        }
+
         private static DateTime NormalizeUtc(DateTime value)
         {
             return value.Kind switch

@@ -33,11 +33,13 @@ BootScene
 앱 resume
   -> 대기 중인 24시간 복귀 알림 취소
   -> 다음 주간 마감 알림 재계산
+  -> 마감 시각은 지났지만 리셋 전이면 즉시 마감 알림 예약
 
 앱 pause 또는 quit
   -> 마지막 플레이 UTC 저장
   -> 24시간 복귀 알림 예약
   -> 다음 주간 마감 알림 예약
+  -> 마감 시각은 지났지만 리셋 전이면 즉시 마감 알림 예약
 ```
 
 ## UGS Dashboard 계약
@@ -55,5 +57,6 @@ Reset schedule은 서비스 권한이 필요한 운영 설정이므로 저장소
 2. Inspector의 테스트용 짧은 지연값으로 앱을 백그라운드 전환한 뒤 복귀 알림을 확인한다.
 3. 앱을 알림 전에 다시 열면 기존 복귀 알림이 취소되는지 확인한다.
 4. `WeeklyRankingSchedule` 테스트에서 수요일 경계 전후의 다음 리셋 시각을 확인한다.
-5. UGS Dashboard에서 화요일 15:00 UTC 주간 Reset schedule을 설정한다.
-6. 실제 리셋 이후 이전 점수가 현재 랭킹에서 제외되고 새 제출이 1위부터 시작하는지 확인한다.
+5. `LocalNotificationController` Inspector의 `Dev/Schedule Test Notification` 컨텍스트 메뉴로 10초 테스트 알림을 확인한다.
+6. UGS Dashboard에서 화요일 15:00 UTC 주간 Reset schedule을 설정한다.
+7. 실제 리셋 이후 이전 점수가 현재 랭킹에서 제외되고 새 제출이 1위부터 시작하는지 확인한다.

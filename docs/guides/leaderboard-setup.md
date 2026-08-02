@@ -1,45 +1,68 @@
-# 리더보드 셋업 가이드
+# UGS Leaderboards 설정 가이드
 
-`Slot_Rogue_Leaderboard`를 로컬 Unity 프로젝트와 연결하고 런타임 제출·조회를 검증하는 절차다. 데이터 계약은 [ADR-0012](../adr/0012-leaderboard-nickname-only-profile.md), 런타임 구조는 [`leaderboard.md`](../design-docs/leaderboard.md)를 따른다.
+_Last updated: 2026-08-02_
 
-## 프로젝트 연결
+이 문서는 SlotRogue 출시 빌드가 기대하는 Unity Gaming Services Leaderboards 설정값을 기록한다. 코드 쪽 계약은 [ADR-0012](../adr/0012-leaderboard-nickname-only-profile.md)를 따른다.
 
-1. Unity Editor에서 `Edit > Project Settings > Services`를 연다.
-2. Dashboard에서 `Slot_Rogue_Leaderboard`를 만든 Cloud Project를 선택해 프로젝트를 연결한다.
-3. `ProjectSettings/ProjectSettings.asset`의 `cloudProjectId`가 비어 있지 않은지 확인한다.
-4. 개발 환경을 별도로 쓴다면 Dashboard와 클라이언트 environment 이름을 맞춘다. 현재 코드는 기본 production environment를 사용한다.
+## 1. Unity 프로젝트 연결
 
-현재 저장소의 `cloudProjectId`는 비어 있으므로 이 연결 전에는 인증과 리더보드 요청이 성공하지 않는다. Cloud Project ID는 임의로 입력하지 말고 Unity Services 연결 절차로 설정한다.
+- Unity Cloud Project ID: `b1aeb280-d45e-44b0-b0cb-0279b956f852`
+- Project Settings 기준 `organizationId`: `danggunee`
+- Project Settings 기준 `projectName`: `Slot Rogue`
+- `cloudEnabled` 값은 로컬 설정상 `0`으로 보일 수 있다. UGS 런타임은 Unity Services 초기화와 Cloud Project 연결 상태를 별도로 확인한다.
 
-## Dashboard 설정
+## 2. 리더보드 리소스
+
+UGS Dashboard에서 아래 리더보드가 있어야 한다.
 
 | 항목 | 값 |
-|------|----|
+| --- | --- |
 | Leaderboard ID | `Slot_Rogue_Leaderboard` |
-| Sort order | Descending |
-| Update strategy | Keep Best |
-| Score type | Numeric |
-| Reset schedule | 매주 화요일 15:00 UTC |
+| Ranking type | `Highest to lowest` |
+| Update type | `Best score` |
+| Score format | `Numeric` |
+| Reset schedule | `Every week on Tuesday at 15:00 starting on August 4th, 2026 UTC` |
+| KST 기준 리셋 | 매주 수요일 00:00 |
+| Buckets | `None` |
+| Tiers | `None` |
 
-화요일 15:00 UTC는 한국 시간 수요일 00:00 KST다. Dashboard의 Reset schedule은 이 시각에 매주 반복되도록 설정한다. 클라이언트의 마감 알림 기본값은 리셋 3시간 전이다.
+`Archive scores on reset`은 MVP 출시 기준 필수는 아니다. 과거 시즌 결과를 게임 안에서 다시 보여줄 계획이 생기면 켜고, 그 전에는 운영 부담을 줄이기 위해 꺼둬도 된다.
 
-최고 점수보다 낮은 score를 제출했을 때 기존 metadata도 유지되는지 Dashboard 설정과 패키지 동작을 플레이테스트로 확인한다.
+## 3. 런타임 코드 계약
 
-## 런타임 확인
+코드 기준값:
 
-1. `BootScene`부터 Play한다.
-2. 최초 진입 시 닫을 수 없는 `LOGIN` 패널이 열리는지 확인한다.
-3. 닉네임을 입력하고 `LOGIN`을 눌러 Authentication Player Name과 로컬 공개 프로필이 저장되는지 확인한다.
-4. 런에서 패배한 뒤 참가 확인 없이 score와 metadata가 자동 제출되는지 확인한다.
-5. 패배 화면의 `RESTART`, `RANKING`, `HOME` 버튼이 각각 새 런, Top 10 패널, GameStart 이동을 수행하는지 확인한다.
-6. Dashboard에서 해당 엔트리의 `Wave`, `RelicIds`, `SchemaVersion`을 확인한다.
+- `LeaderboardConstants.Id`: `Slot_Rogue_Leaderboard`
+- `LeaderboardConstants.MetadataSchemaVersion`: `3`
+- `LeaderboardConstants.DisplayLimit`: `100`
+- 최고 기록 저장 키: `SlotRogue.Leaderboard.BestWave`
+- UGS 초기화 위치: `BootController` -> `SlotRogueLeaderboardService.InitializeAsync()`
 
-## 실패 진단
+점수는 현재 런에서 도달한 wave 값이다. 코드상 `Capture(...)`가 `RunProgress.CurrentBattleNumber`를 최소 `1`로 보정해 `score`와 metadata `wave`에 넣는다.
 
-| 증상 | 확인 |
-|------|------|
-| Project ID missing | Unity 프로젝트가 올바른 Cloud Project에 연결되었는지 확인 |
-| Leaderboard not found | ID 대소문자와 environment 확인 |
-| Unauthorized | 익명 인증 활성화와 Authentication 설정 확인 |
-| 이름 변경 실패 | 공백 제거, UGS Player Name 정책 확인 |
-| metadata가 비어 있음 | 조회 옵션의 `IncludeMetadata`와 기존 엔트리 재제출 확인 |
+제출 metadata 구조:
+
+| 필드 | 설명 |
+| --- | --- |
+| `schemaVersion` | metadata 스키마 버전. 현재 `3` |
+| `wave` | 제출 점수와 같은 도달 wave |
+| `relicIds` | 런 종료 시 보유 유물 ID 목록 |
+| `symbolCounts` | 심볼별 가중치/카운트 스냅샷 |
+| `profileIconId` | 플레이어가 고른 랭킹 아이콘 |
+| `message` | 플레이어가 고른 랭킹 메시지 |
+
+## 4. Mock 랭킹 주의
+
+`SlotRogueLeaderboardService.UseMockEntries`는 `UNITY_EDITOR || DEVELOPMENT_BUILD`에서만 컴파일된다.
+
+- 일반 릴리즈 빌드: mock 랭킹 코드가 빠진다.
+- Editor / Development Build: `UseMockEntries`가 켜져 있으면 UGS 조회 대신 샘플 랭킹을 보여준다.
+- 실서비스 검증: Editor 또는 Development Build에서 `UseMockEntries = false`로 바꾸고 제출/조회가 실제 UGS에 도달하는지 확인한다.
+
+## 5. 출시 전 확인 절차
+
+1. UGS Dashboard에서 위 리더보드 설정값을 다시 확인한다.
+2. 닉네임 설정 후 한 런을 종료해 최고 기록 자동 제출을 확인한다.
+3. Dashboard 또는 클라이언트 랭킹 UI에서 같은 점수가 조회되는지 확인한다.
+4. 더 낮은 점수를 다시 제출했을 때 `Best score` 정책으로 최고 기록이 유지되는지 확인한다.
+5. 2026-08-04 15:00 UTC 이후 첫 주간 리셋이 의도대로 동작하는지 운영 로그로 확인한다.

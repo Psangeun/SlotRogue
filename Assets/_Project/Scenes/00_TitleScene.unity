@@ -819,9 +819,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cba3d5a2bc864cd19b4e101a8a7e1962, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SlotRogue.UI::SlotRogue.UI.Ads.AdsManager
-  appKey: 
-  rewardedAdUnitId: 
-  productionAdsEnabled: 0
+  appKey: 26b7dd5b5
+  rewardedAdUnitId: yfh9w61g1dze7nkd
+  productionAdsEnabled: 1
   allowLiveAdsInDebugBuilds: 0
   debugAppKey: 
   debugRewardedAdUnitId: 
@@ -2682,6 +2682,7 @@ MonoBehaviour:
   _notificationsEnabled: 1
   _inactivityHours: 24
   _rankingDeadlineLeadHours: 3
+  _showRankingReminderInForeground: 1
   _androidChannelId: slotrogue_reminders
   _androidChannelName: "SlotRogue \uC54C\uB9BC"
   _androidChannelDescription: "\uBCF5\uADC0 \uBC0F \uC8FC\uAC04 \uB7AD\uD0B9 \uB9C8\uAC10
@@ -2692,6 +2693,7 @@ MonoBehaviour:
   _rankingTitle: "\uC8FC\uAC04 \uB7AD\uD0B9 \uB9C8\uAC10 \uC784\uBC15"
   _rankingText: "\uC8FC\uAC04 \uB7AD\uD0B9\uC774 \uACE7 \uB9C8\uAC10\uB3FC\uC694.
     \uB9C8\uC9C0\uB9C9 \uAE30\uB85D\uC5D0 \uB3C4\uC804\uD558\uC138\uC694!"
+  _devTestNotificationDelaySeconds: 10
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

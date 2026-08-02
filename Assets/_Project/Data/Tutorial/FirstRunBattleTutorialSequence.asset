@@ -17,54 +17,54 @@ MonoBehaviour:
     _messagePlacement: 2
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      슬롯을 돌려 그림을 맞추면 몬스터를 공격해요.
-      계속 처치하며 오래 버티는 게 목표!
+    _message: "\uC2AC\uB86F\uC744 \uB3CC\uB824 \uADF8\uB9BC\uC744 \uB9DE\uCD94\uBA74
+      \uBAAC\uC2A4\uD130\uB97C \uACF5\uACA9\uD574\uC694. \uACC4\uC18D \uCC98\uCE58\uD558\uBA70
+      \uC624\uB798 \uBC84\uD2F0\uB294 \uAC8C \uBAA9\uD45C!"
     _showHand: 0
   - _targetKey: 1
     _messagePlacement: 5
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: 먼저 [스핀]으로 슬롯을 돌려요.
+    _message: "\uBA3C\uC800 [\uC2A4\uD540]\uC73C\uB85C \uC2AC\uB86F\uC744 \uB3CC\uB824\uC694."
     _showHand: 1
   - _targetKey: 0
     _messagePlacement: 2
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      같은 그림이 줄·모양으로 맞으면 '족보'가 되어 피해를 줘요.
-      많이·크게 맞출수록, 한 번에 여러 개 터뜨릴수록 세요!
+    _message: "\uAC19\uC740 \uADF8\uB9BC\uC774 \uC904\xB7\uBAA8\uC591\uC73C\uB85C
+      \uB9DE\uC73C\uBA74 '\uC871\uBCF4'\uAC00 \uB418\uC5B4 \uD53C\uD574\uB97C \uC918\uC694.
+      \uB9CE\uC774\xB7\uD06C\uAC8C \uB9DE\uCD9C\uC218\uB85D, \uD55C \uBC88\uC5D0
+      \uC5EC\uB7EC \uAC1C \uD130\uB728\uB9B4\uC218\uB85D \uC138\uC694!"
     _showHand: 0
   - _targetKey: 0
     _messagePlacement: 2
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      그림마다 세기가 달라요.
-      <sprite index=0><sprite index=5> 자주·약함 · <sprite index=3><sprite index=4> 보통 · <sprite index=2> 강함 · <sprite index=1> 드물지만 최강!
+    _message: "\uADF8\uB9BC\uB9C8\uB2E4 \uC138\uAE30\uAC00 \uB2EC\uB77C\uC694. <sprite
+      index=0><sprite index=5> \uC790\uC8FC\xB7\uC57D\uD568 \xB7 <sprite index=3><sprite
+      index=4> \uBCF4\uD1B5 \xB7 <sprite index=2> \uAC15\uD568 \xB7 <sprite index=1>
+      \uB4DC\uBB3C\uC9C0\uB9CC \uCD5C\uAC15!"
     _showHand: 0
   - _targetKey: 2
     _messagePlacement: 5
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      그림이 아쉬우면 '자리 바꾸기'로 바꿔요.
-      단, 바꾼 턴엔 별조각을 못 받아요!
+    _message: "\uADF8\uB9BC\uC774 \uC544\uC26C\uC6B0\uBA74 '\uC790\uB9AC \uBC14\uAFB8\uAE30'\uB85C
+      \uBC14\uAFD4\uC694. \uB2E8, \uBC14\uAFBC \uD134\uC5D4 \uBCC4\uC870\uAC01\uC744
+      \uBABB \uBC1B\uC544\uC694!"
     _showHand: 1
   - _targetKey: 3
     _messagePlacement: 7
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      자리 안 바꾸고 이기면 별조각 획득.
-      상점에서 유물을 사서 강해져요.
+    _message: "\uC790\uB9AC \uC548 \uBC14\uAFB8\uACE0 \uC774\uAE30\uBA74 \uBCC4\uC870\uAC01
+      \uD68D\uB4DD. \uC0C1\uC810\uC5D0\uC11C \uC720\uBB3C\uC744 \uC0AC\uC11C \uAC15\uD574\uC838\uC694."
     _showHand: 1
   - _targetKey: 4
     _messagePlacement: 6
     _messageOffset: {x: 0, y: 0}
     _messageSize: {x: 0, y: 0}
-    _message: |-
-      몬스터의 다음 공격 예고예요.
-      턴 안에 처치하고 체력을 지키세요!
+    _message: "\uBAAC\uC2A4\uD130\uC758 \uB2E4\uC74C \uACF5\uACA9 \uC608\uACE0\uC608\uC694.
+      \uD134 \uC548\uC5D0 \uCC98\uCE58\uD558\uACE0 \uCCB4\uB825\uC744 \uC9C0\uD0A4\uC138\uC694!"
     _showHand: 1
   _completionMessage: 

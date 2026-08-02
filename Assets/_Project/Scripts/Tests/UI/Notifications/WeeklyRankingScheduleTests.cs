@@ -113,5 +113,63 @@ namespace SlotRogue.UI.Tests.Notifications
                     0,
                     DateTimeKind.Utc)));
         }
+
+        [Test]
+        public void NextDeadlineNotification_AfterDeadlineBeforeReset_UsesImmediateFallback()
+        {
+            var utcNow = new DateTime(
+                2026,
+                6,
+                16,
+                13,
+                0,
+                0,
+                DateTimeKind.Utc);
+
+            DateTime result = WeeklyRankingSchedule.GetNextDeadlineNotificationUtc(
+                utcNow,
+                TimeSpan.FromHours(3),
+                TimeSpan.FromSeconds(5));
+
+            Assert.That(
+                result,
+                Is.EqualTo(new DateTime(
+                    2026,
+                    6,
+                    16,
+                    13,
+                    0,
+                    5,
+                    DateTimeKind.Utc)));
+        }
+
+        [Test]
+        public void NextDeadlineNotification_TooCloseToReset_UsesNextWeek()
+        {
+            var utcNow = new DateTime(
+                2026,
+                6,
+                16,
+                14,
+                59,
+                58,
+                DateTimeKind.Utc);
+
+            DateTime result = WeeklyRankingSchedule.GetNextDeadlineNotificationUtc(
+                utcNow,
+                TimeSpan.FromHours(3),
+                TimeSpan.FromSeconds(5));
+
+            Assert.That(
+                result,
+                Is.EqualTo(new DateTime(
+                    2026,
+                    6,
+                    23,
+                    12,
+                    0,
+                    0,
+                    DateTimeKind.Utc)));
+        }
     }
 }
